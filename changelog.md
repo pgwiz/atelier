@@ -22,6 +22,11 @@ All notable changes to Atelier will be documented in this file.
 - **Strict Zero-Gradients Enforcement**:
   - Completely eliminated all `linear-gradient` and `radial-gradient` rules from all CSS stylesheets, themes, canvas backdrops, buttons, headers, and card resize handles.
   - Replaced backdrops with crisp solid backgrounds and vector grid patterns.
+- **Compressed Navbar & Theme Control Enhancements**:
+  - Replaced theme select dropdown with a sleek theme icon button (`#theme-toggle-btn`) in the sidebar footer that seamlessly cycles through the 5 themes on click.
+  - In compressed navbar mode, the theme control shrinks into a centered 36x36px icon button.
+  - In compressed navbar mode, the top project brand icon flips to a hamburger icon (`fa-bars`) on hover, and clicking it expands the navbar back to full width.
+  - Added persistence for sidebar collapsed/expanded state in `localStorage`.
 - **UI State & Polish**:
   - Enhanced active/checked favorite star icons with gold accent styling (`var(--warning)`).
 

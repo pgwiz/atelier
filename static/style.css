@@ -178,11 +178,13 @@ code, .code-font {
 }
 
 .sidebar.collapsed .brand-text,
+.sidebar.collapsed .sidebar-toggle-btn,
 .sidebar.collapsed .nav-label,
 .sidebar.collapsed .nav-badge,
-.sidebar.collapsed .theme-control label,
+.sidebar.collapsed .theme-btn-label,
+.sidebar.collapsed .footer-label,
 .sidebar.collapsed .offline-badge {
-  display: none;
+  display: none !important;
 }
 
 .sidebar-header {
@@ -191,6 +193,12 @@ code, .code-font {
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--border-subtle);
+  transition: all 0.2s ease;
+}
+
+.sidebar.collapsed .sidebar-header {
+  justify-content: center;
+  padding: 1.25rem 0.5rem;
 }
 
 .brand {
@@ -198,19 +206,56 @@ code, .code-font {
   align-items: center;
   gap: 0.75rem;
   user-select: none;
+  transition: all 0.2s ease;
+}
+
+.sidebar.collapsed .brand {
+  justify-content: center;
+  width: 100%;
+  cursor: pointer;
 }
 
 .brand-icon {
-  font-size: 1.25rem;
+  font-size: 1.15rem;
   color: var(--primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   background-color: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
+  transition: all 0.15s ease;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.brand-icon .icon-project {
+  display: inline-block;
+  transition: opacity 0.15s ease;
+}
+
+.brand-icon .icon-hamburger {
+  display: none;
+}
+
+/* On hover in compressed/collapsed navbar, the project icon flips to a hamburger icon */
+.sidebar.collapsed .brand:hover .brand-icon .icon-project,
+.sidebar.collapsed .brand-icon:hover .icon-project {
+  display: none;
+}
+
+.sidebar.collapsed .brand:hover .brand-icon .icon-hamburger,
+.sidebar.collapsed .brand-icon:hover .icon-hamburger {
+  display: inline-block;
+  color: var(--primary);
+}
+
+.sidebar.collapsed .brand:hover .brand-icon,
+.sidebar.collapsed .brand-icon:hover {
+  background-color: var(--bg-card-hover);
+  border-color: var(--border-focus);
 }
 
 .brand-title {
@@ -317,12 +362,91 @@ code, .code-font {
   font-family: ui-monospace, SFMono-Regular, monospace;
 }
 
+.sidebar.collapsed .nav-item {
+  justify-content: center;
+  padding: 0.65rem 0;
+}
+
+.sidebar.collapsed .nav-icon {
+  margin: 0;
+}
+
 .sidebar-footer {
   padding: 1rem;
   border-top: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.sidebar.collapsed .sidebar-footer {
+  padding: 0.85rem 0.5rem;
+  align-items: center;
+}
+
+.sidebar.collapsed .theme-control {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.theme-toggle-btn:hover {
+  background-color: var(--bg-card-hover);
+  border-color: var(--border-focus);
+  color: var(--primary);
+}
+
+.theme-btn-icon {
+  font-size: 0.95rem;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  flex-shrink: 0;
+}
+
+.theme-btn-label {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.theme-btn-label strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.sidebar.collapsed .theme-toggle-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+.sidebar.collapsed .theme-btn-icon {
+  width: 100%;
 }
 
 .footer-label {

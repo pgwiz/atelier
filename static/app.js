@@ -34,28 +34,102 @@ document.addEventListener('DOMContentLoaded', () => {
   refreshAllData();
 });
 
+const THEMES = [
+  { id: 'dark', name: 'Dark Slate' },
+  { id: 'light', name: 'Crisp Light' },
+  { id: 'sepia', name: 'Warm Sepia' },
+  { id: 'pastel', name: 'Pastel Dream' },
+  { id: 'cyberpunk', name: 'Cyberpunk Neon' },
+];
+
 function initTheme() {
   const savedTheme = localStorage.getItem('atelier_theme') || 'dark';
-  document.documentElement.setAttribute('data-theme', savedTheme);
+  applyTheme(savedTheme, false);
+
+  const themeToggleBtn = document.getElementById('theme-toggle-btn');
+  if (themeToggleBtn) {
+    themeToggleBtn.addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const currentIndex = THEMES.findIndex(t => t.id === current);
+      const nextIndex = (currentIndex + 1) % THEMES.length;
+      const nextTheme = THEMES[nextIndex];
+      applyTheme(nextTheme.id, true);
+    });
+  }
 
   const themeSelect = document.getElementById('theme-select');
   if (themeSelect) {
     themeSelect.value = savedTheme;
     themeSelect.addEventListener('change', (e) => {
-      const theme = e.target.value;
-      document.documentElement.setAttribute('data-theme', theme);
-      localStorage.setItem('atelier_theme', theme);
-      showToast(`Theme changed to ${e.target.options[e.target.selectedIndex].text}`);
+      applyTheme(e.target.value, true);
     });
+  }
+}
+
+function applyTheme(themeId, notify = false) {
+  const themeObj = THEMES.find(t => t.id === themeId) || THEMES[0];
+  document.documentElement.setAttribute('data-theme', themeObj.id);
+  localStorage.setItem('atelier_theme', themeObj.id);
+
+  const currentThemeLabel = document.getElementById('current-theme-name');
+  if (currentThemeLabel) {
+    currentThemeLabel.textContent = themeObj.name;
+  }
+
+  const themeToggleBtn = document.getElementById('theme-toggle-btn');
+  if (themeToggleBtn) {
+    themeToggleBtn.title = `Theme: ${themeObj.name} (Click to switch)`;
+  }
+
+  const themeSelect = document.getElementById('theme-select');
+  if (themeSelect && themeSelect.value !== themeObj.id) {
+    themeSelect.value = themeObj.id;
+  }
+
+  if (notify) {
+    showToast(`Theme switched to ${themeObj.name}`);
   }
 }
 
 function initSidebar() {
   const sidebar = document.getElementById('sidebar');
   const toggleBtn = document.getElementById('sidebar-toggle');
+  const brandContainer = document.getElementById('brand-container');
+
+  // Restore saved sidebar collapsed state
+  const isCollapsed = localStorage.getItem('atelier_sidebar_collapsed') === 'true';
+  if (isCollapsed && sidebar) {
+    sidebar.classList.add('collapsed');
+    updateBrandTitle(true);
+  }
+
+  function setSidebarCollapsed(collapsed) {
+    if (!sidebar) return;
+    sidebar.classList.toggle('collapsed', collapsed);
+    localStorage.setItem('atelier_sidebar_collapsed', collapsed ? 'true' : 'false');
+    updateBrandTitle(collapsed);
+  }
+
+  function updateBrandTitle(collapsed) {
+    if (brandContainer) {
+      brandContainer.title = collapsed ? 'Click to expand sidebar' : 'Atelier';
+    }
+  }
+
   if (toggleBtn && sidebar) {
-    toggleBtn.addEventListener('click', () => {
-      sidebar.classList.toggle('collapsed');
+    toggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isNowCollapsed = !sidebar.classList.contains('collapsed');
+      setSidebarCollapsed(isNowCollapsed);
+    });
+  }
+
+  if (brandContainer && sidebar) {
+    brandContainer.addEventListener('click', () => {
+      // If navbar is compressed, clicking the brand icon expands it
+      if (sidebar.classList.contains('collapsed')) {
+        setSidebarCollapsed(false);
+      }
     });
   }
 }
