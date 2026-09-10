@@ -203,6 +203,10 @@ class AtelierCanvas {
       this.exportBoardAsSvg();
     });
 
+    document.getElementById('btn-export-board-json')?.addEventListener('click', () => {
+      if (this.exportMenu) this.exportMenu.style.display = 'none';
+    });
+
     // Dismiss popovers and context menu on outside click
     window.addEventListener('click', (e) => {
       if (!e.target.closest('#shapes-tool-container') && this.shapesFlyout) {
@@ -2338,14 +2342,15 @@ class AtelierCanvas {
     e.preventDefault();
     e.stopPropagation();
 
-    const targetCard = e.target.closest('.board-card');
+    const clickedTarget = this.rightClickStart?.target || e.target;
+    const targetCard = (clickedTarget && clickedTarget.closest) ? clickedTarget.closest('.board-card') : (e.target && e.target.closest ? e.target.closest('.board-card') : null);
     let cardId = null;
     if (targetCard) {
       cardId = parseInt(targetCard.id.replace('card-', ''), 10);
     }
 
     let svgId = null;
-    const targetSvg = e.target.closest('#canvas-svg path, #canvas-svg rect, #canvas-svg ellipse, #canvas-svg line, #canvas-svg polygon, #canvas-svg text');
+    const targetSvg = (clickedTarget && clickedTarget.closest) ? clickedTarget.closest('#canvas-svg path, #canvas-svg rect, #canvas-svg ellipse, #canvas-svg line, #canvas-svg polygon, #canvas-svg text') : (e.target && e.target.closest ? e.target.closest('#canvas-svg path, #canvas-svg rect, #canvas-svg ellipse, #canvas-svg line, #canvas-svg polygon, #canvas-svg text') : null);
     if (targetSvg && targetSvg.id && targetSvg.id !== 'canvas-grid-pattern' && this.drawingData.some((d) => d.id === targetSvg.id)) {
       svgId = targetSvg.id;
     }
