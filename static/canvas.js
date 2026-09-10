@@ -81,7 +81,14 @@ class AtelierCanvas {
       this.viewport.addEventListener('pointerdown', (e) => this.handlePointerDown(e));
       window.addEventListener('pointermove', (e) => this.handlePointerMove(e));
       window.addEventListener('pointerup', (e) => this.handlePointerUp(e));
+      window.addEventListener('pointercancel', (e) => this.handlePointerUp(e));
       this.viewport.addEventListener('wheel', (e) => this.handleWheel(e), { passive: false });
+
+      this.viewport.addEventListener('dragstart', (e) => {
+        if (this.currentTool !== 'select') {
+          e.preventDefault();
+        }
+      });
 
       this.viewport.addEventListener('dragover', (e) => {
         e.preventDefault();
@@ -104,6 +111,11 @@ class AtelierCanvas {
         }
       });
     }
+
+    // Stop pointerdown propagation from floating controls to prevent unwanted drawing
+    document.querySelectorAll('#canvas-tools, #canvas-palette, #canvas-stroke-width, .canvas-history-controls, .canvas-zoom-controls, .canvas-navbar, .canvas-drawer').forEach((ctrl) => {
+      ctrl.addEventListener('pointerdown', (e) => e.stopPropagation());
+    });
 
     // Canvas tools buttons
     document.querySelectorAll('#canvas-tools .tool-btn').forEach((btn) => {
@@ -237,6 +249,9 @@ class AtelierCanvas {
   }
 
   loadBoard(board, items) {
+    if (!this.viewport || !this.svg || !this.svgDrawingGroup) {
+      this.initDOMElements();
+    }
     this.board = board;
     this.items = items || [];
     this.drawingData = Array.isArray(board.drawing_data) ? board.drawing_data : [];
@@ -521,6 +536,20 @@ class AtelierCanvas {
 
     if (e.button !== 0) return; // Only primary button for drawing/selecting
 
+    // Ignore clicks on floating UI controls or toolbar buttons
+    if (e.target.closest('#canvas-tools, #canvas-palette, #canvas-stroke-width, .canvas-history-controls, .canvas-zoom-controls, .canvas-navbar, .canvas-drawer, .canvas-inline-editor')) {
+      return;
+    }
+
+    // Capture pointer so drawing gestures never get lost on fast moves
+    try {
+      if (this.viewport) this.viewport.setPointerCapture(e.pointerId);
+    } catch (_) {}
+
+    if (this.currentTool !== 'select') {
+      e.preventDefault();
+    }
+
     const worldPos = this.screenToWorld(e.clientX, e.clientY);
 
     if (this.currentTool === 'select') {
@@ -644,6 +673,12 @@ class AtelierCanvas {
   }
 
   handlePointerUp(e) {
+    try {
+      if (this.viewport && this.viewport.hasPointerCapture(e.pointerId)) {
+        this.viewport.releasePointerCapture(e.pointerId);
+      }
+    } catch (_) {}
+
     if (this.isPanning) {
       this.isPanning = false;
       this.updateCursor();
@@ -684,8 +719,19 @@ class AtelierCanvas {
             id: 'stroke-' + Date.now(),
             type: 'stroke',
             points: [...this.activeStrokePoints],
-            color: this.currentColor,
-            width: this.currentStrokeWidth,
+            color: this.currentColor || '#3b82f6',
+            width: this.currentStrokeWidth || 2,
+          };
+          this.pushDrawingElement(stroke);
+        } else if (this.activeStrokePoints.length === 1) {
+          // Single tap/click creates a clean dot
+          const pt = this.activeStrokePoints[0];
+          const stroke = {
+            id: 'stroke-' + Date.now(),
+            type: 'stroke',
+            points: [pt, { x: pt.x + 0.1, y: pt.y + 0.1 }],
+            color: this.currentColor || '#3b82f6',
+            width: Math.max((this.currentStrokeWidth || 2) * 2, 4),
           };
           this.pushDrawingElement(stroke);
         }
@@ -954,21 +1000,20 @@ class AtelierCanvas {
 
     // Card Selection & Dragging
     el.addEventListener('pointerdown', (e) => {
+      if (this.currentTool !== 'select') return;
       if (e.target.closest('.card-resize-handle') || e.target.closest('.connector-anchor') || e.target.closest('.action-icon-btn') || e.target.tagName === 'TEXTAREA') {
         return;
       }
       e.stopPropagation();
       this.selectCard(item.id);
 
-      if (this.currentTool === 'select') {
-        this.isDraggingCard = true;
-        this.draggedCard = item;
-        const worldPos = this.screenToWorld(e.clientX, e.clientY);
-        this.dragOffset = {
-          x: worldPos.x - item.pos_x,
-          y: worldPos.y - item.pos_y,
-        };
-      }
+      this.isDraggingCard = true;
+      this.draggedCard = item;
+      const worldPos = this.screenToWorld(e.clientX, e.clientY);
+      this.dragOffset = {
+        x: worldPos.x - item.pos_x,
+        y: worldPos.y - item.pos_y,
+      };
     });
 
     return el;
@@ -1346,15 +1391,21 @@ class AtelierCanvas {
   }
 
   renderActiveStroke() {
-    if (!this.svgActiveStrokeGroup || this.activeStrokePoints.length < 2) return;
+    if (!this.svgActiveStrokeGroup || this.activeStrokePoints.length === 0) return;
 
-    let d = `M ${this.activeStrokePoints[0].x} ${this.activeStrokePoints[0].y}`;
-    for (let i = 1; i < this.activeStrokePoints.length; i++) {
-      d += ` L ${this.activeStrokePoints[i].x} ${this.activeStrokePoints[i].y}`;
+    let d;
+    if (this.activeStrokePoints.length === 1) {
+      const p = this.activeStrokePoints[0];
+      d = `M ${p.x} ${p.y} L ${p.x + 0.1} ${p.y + 0.1}`;
+    } else {
+      d = `M ${this.activeStrokePoints[0].x} ${this.activeStrokePoints[0].y}`;
+      for (let i = 1; i < this.activeStrokePoints.length; i++) {
+        d += ` L ${this.activeStrokePoints[i].x} ${this.activeStrokePoints[i].y}`;
+      }
     }
 
     this.svgActiveStrokeGroup.innerHTML = `
-      <path d="${d}" fill="none" stroke="${this.currentColor}" stroke-width="${this.currentStrokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="${d}" fill="none" stroke="${this.currentColor || '#3b82f6'}" stroke-width="${this.currentStrokeWidth || 2}" stroke-linecap="round" stroke-linejoin="round"/>
     `;
   }
 
@@ -1368,7 +1419,7 @@ class AtelierCanvas {
       const h = Math.abs(worldPos.y - this.activeShapeStart.y);
 
       this.svgActiveStrokeGroup.innerHTML = `
-        <rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${this.currentColor}" stroke-width="${this.currentStrokeWidth}" stroke-dasharray="3 3"/>
+        <rect x="${x}" y="${y}" width="${w}" height="${h}" fill="rgba(56, 189, 248, 0.08)" stroke="${this.currentColor || '#3b82f6'}" stroke-width="${this.currentStrokeWidth || 2}" stroke-dasharray="3 3"/>
       `;
     } else if (this.currentTool === 'ellipse') {
       const cx = (this.activeShapeStart.x + worldPos.x) / 2;
@@ -1377,7 +1428,7 @@ class AtelierCanvas {
       const ry = Math.abs(worldPos.y - this.activeShapeStart.y) / 2;
 
       this.svgActiveStrokeGroup.innerHTML = `
-        <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="${this.currentColor}" stroke-width="${this.currentStrokeWidth}" stroke-dasharray="3 3"/>
+        <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="rgba(56, 189, 248, 0.08)" stroke="${this.currentColor || '#3b82f6'}" stroke-width="${this.currentStrokeWidth || 2}" stroke-dasharray="3 3"/>
       `;
     }
   }

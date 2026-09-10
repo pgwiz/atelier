@@ -21,11 +21,14 @@ Atelier is a local-only, single-user content sketchbook and visual planning canv
   - Max `border-radius: 8px` enforced across all CSS rules, eliminating pills and circular cards.
   - Strictly zero gradients (`linear-gradient` / `radial-gradient` completely absent); clean solid surfaces with crisp 1px borders.
   - 5 High-contrast themes (`dark`, `light`, `sepia`, `pastel`, `cyberpunk`) saved to `localStorage`.
-  - Canvas engine (`static/canvas.js`):
-    - Unified coordinate space: `translate(${panX}px, ${panY}px) scale(${zoom})`.
-    - World <-> Screen coordinate transformations.
-    - SVG layer for drawings, shapes, floating text, and dynamic connectors.
-    - HTML layer for draggable/resizable cards (Prompts, Characters, Links, Sticky Notes).
+  - Canvas engine (`static/canvas.js` & `static/style.css`):
+    - Unified coordinate space: `.canvas-world` and `.canvas-svg-layer` aligned at `top: 0; left: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none;`.
+    - Camera transform: `translate(${panX}px, ${panY}px) scale(${zoom})` on `.canvas-world`.
+    - World <-> Screen coordinate transformations precisely aligned across SVG vector layer and HTML cards layer.
+    - SVG layer for freehand strokes (`<path>`), shapes (`<rect>`, `<ellipse>`), floating text (`<text>`), and dynamic connectors.
+    - Active stroke rendering on mouse press with instant 1-point dot preview (`M x y L x+0.1 y+0.1`) and smooth expansion.
+    - Pointer capture (`setPointerCapture` / `releasePointerCapture`), dragstart prevention, and pointercancel gesture cleanup.
+    - HTML layer for draggable/resizable cards (Prompts, Characters, Links, Parts, Sticky Notes) with 3px solid top accents.
     - Smart snapping connectors dynamically track card anchors and recalculate paths on card movement.
 - **Phase 9: Projects-First Creative OS & Dual Storage**:
   - Central relational DB (`data/atelier.db`) handles indexing, pooling, and cross-project operations.

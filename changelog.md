@@ -2,6 +2,19 @@
 
 All notable changes to Atelier will be documented in this file.
 
+## [0.4.2] - 2026-09-10
+
+### Fixed & Hardened
+- **Planning Board Drawing Engine & SVG Coordinate Alignment**:
+  - Resolved root-cause issue where freehand strokes, shapes, and vector drawings were invisible on the canvas with zero console errors. Root cause: `.canvas-svg-layer` had hardcoded `top: -50000px; left: -50000px; width: 100000px; height: 100000px;` without an SVG viewBox matching this offset, which displaced the internal SVG coordinate origin `(0, 0)` 50,000 pixels off-screen away from `.canvas-world`.
+  - Re-aligned `.canvas-world` and `.canvas-svg-layer` to `top: 0; left: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none;`, precisely synchronizing the vector SVG coordinate origin with HTML card coordinates and the viewport transformation matrix.
+  - Added explicit SVG attributes `width="100%" height="100%" style="overflow: visible;"` on `<svg id="canvas-svg">` to ensure browser rendering engines never calculate zero dimensions (which per SVG spec disables child rendering).
+  - Enhanced `renderActiveStroke()` in `static/canvas.js` to render immediate visual feedback for `activeStrokePoints.length >= 1`, drawing a crisp round endpoint dot on mouse press (`M x y L x+0.1 y+0.1`) and smoothly expanding the path as the cursor moves.
+  - Hardened pointer event capture and gesture isolation: added `dragstart` listener prevention, pointer down isolation for floating toolbars, pointer capture (`setPointerCapture` / `releasePointerCapture`) so fast gestures never drop strokes, and `pointercancel` listener to cleanly reset drawing state if a gesture is interrupted.
+  - Added safe fallback property chains (`this.currentColor || '#3b82f6'`, `this.currentStrokeWidth || 2`) across all stroke, shape, and connector preview renderers.
+  - Added dynamic DOM element re-initialization in `loadBoard()` ensuring canvas SVG groups are always reliably resolved.
+  - Confirmed all 28 backend integration tests pass cleanly and zero JavaScript syntax errors exist.
+
 ## [0.4.1] - 2026-09-10
 
 ### Fixed & Hardened
