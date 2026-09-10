@@ -1820,3 +1820,199 @@ async fn test_phase10_ai_proxy_validation() {
     assert!(body["content"].as_str().unwrap().contains("Connection test successful"));
 }
 
+#[tokio::test]
+async fn test_board_items_metadata_enrichment_and_fallbacks() {
+    let (app, _state, _dir) = setup_test_app().await;
+
+    // 1. Create a prompt with tags
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/prompts")
+        .header("content-type", "application/json")
+        .body(Body::from(json!({
+            "title": "Master Prompt",
+            "body": "Photorealistic character design rendered in 8k octane",
+            "tags": ["hero", "concept"]
+        }).to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::CREATED);
+    let prompt: Prompt = serde_json::from_slice(&resp.into_body().collect().await.unwrap().to_bytes()).unwrap();
+
+    // 2. Create a character with tags
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/characters")
+        .header("content-type", "application/json")
+        .body(Body::from(json!({
+            "name": "Kaelen Voss",
+            "traits": "Cybernetic arm, trenchcoat, scarred jaw",
+            "tags": ["protagonist"]
+        }).to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::CREATED);
+    let character: Character = serde_json::from_slice(&resp.into_body().collect().await.unwrap().to_bytes()).unwrap();
+
+    // 3. Create a link
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/links")
+        .header("content-type", "application/json")
+        .body(Body::from(json!({
+            "url": "https://example.com/moodboard",
+            "title": "Visual Moodboard Reference",
+            "tags": ["reference"]
+        }).to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::CREATED);
+    let link: Link = serde_json::from_slice(&resp.into_body().collect().await.unwrap().to_bytes()).unwrap();
+
+    // 4. Create a production part
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/projects/1/parts")
+        .header("content-type", "application/json")
+        .body(Body::from(json!({
+            "title": "Scene 1: Introduction",
+            "part_type": "scene",
+            "status": "Draft",
+            "order_index": 1
+        }).to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::CREATED);
+    let part: ProjectPart = serde_json::from_slice(&resp.into_body().collect().await.unwrap().to_bytes()).unwrap();
+
+    // 5. Create a board
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/boards")
+        .header("content-type", "application/json")
+        .body(Body::from(json!({
+            "name": "Planning Board"
+        }).to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::CREATED);
+    let board: Board = serde_json::from_slice(&resp.into_body().collect().await.unwrap().to_bytes()).unwrap();
+
+    // 6. Pin each item to the board
+    // 6a. Pin prompt (test case-insensitivity: "PROMPT")
+    let req = Request::builder()
+        .method("POST")
+        .uri(format!("/api/boards/{}/items", board.id))
+        .header("content-type", "application/json")
+        .body(Body::from(json!({
+            "entity_type": "PROMPT",
+            "entity_id": prompt.id
+        }).to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::CREATED);
+    let prompt_item: BoardItem = serde_json::from_slice(&resp.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    assert_eq!(prompt_item.entity_title.as_deref(), Some("Master Prompt"));
+    assert!(prompt_item.entity_subtitle.unwrap().contains("Photorealistic"));
+    assert!(prompt_item.entity_tags.contains(&"hero".to_string()));
+
+    // 6b. Pin character
+    let req = Request::builder()
+        .method("POST")
+        .uri(format!("/api/boards/{}/items", board.id))
+        .header("content-type", "application/json")
+        .body(Body::from(json!({
+            "entity_type": "character",
+            "entity_id": character.id
+        }).to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::CREATED);
+    let char_item: BoardItem = serde_json::from_slice(&resp.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    assert_eq!(char_item.entity_title.as_deref(), Some("Kaelen Voss"));
+    assert!(char_item.entity_subtitle.unwrap().contains("Cybernetic arm"));
+    assert!(char_item.entity_tags.contains(&"protagonist".to_string()));
+
+    // 6c. Pin link
+    let req = Request::builder()
+        .method("POST")
+        .uri(format!("/api/boards/{}/items", board.id))
+        .header("content-type", "application/json")
+        .body(Body::from(json!({
+            "entity_type": "link",
+            "entity_id": link.id
+        }).to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::CREATED);
+    let link_item: BoardItem = serde_json::from_slice(&resp.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    assert_eq!(link_item.entity_title.as_deref(), Some("Visual Moodboard Reference"));
+    assert_eq!(link_item.entity_subtitle.as_deref(), Some("https://example.com/moodboard"));
+
+    // 6d. Pin part
+    let req = Request::builder()
+        .method("POST")
+        .uri(format!("/api/boards/{}/items", board.id))
+        .header("content-type", "application/json")
+        .body(Body::from(json!({
+            "entity_type": "part",
+            "entity_id": part.id
+        }).to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::CREATED);
+    let part_item: BoardItem = serde_json::from_slice(&resp.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    assert_eq!(part_item.entity_title.as_deref(), Some("Scene 1: Introduction"));
+    assert_eq!(part_item.entity_subtitle.as_deref(), Some("scene • Draft"));
+
+    // 6e. Pin sticky note
+    let req = Request::builder()
+        .method("POST")
+        .uri(format!("/api/boards/{}/items", board.id))
+        .header("content-type", "application/json")
+        .body(Body::from(json!({
+            "entity_type": "note",
+            "note_text": "Remember camera pan timing"
+        }).to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::CREATED);
+    let note_item: BoardItem = serde_json::from_slice(&resp.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    assert_eq!(note_item.entity_title.as_deref(), Some("Sticky Note"));
+    assert_eq!(note_item.note_text.as_deref(), Some("Remember camera pan timing"));
+
+    // 7. Verify GET /api/boards/:id/items returns all 5 items with full metadata
+    let req = Request::builder()
+        .method("GET")
+        .uri(format!("/api/boards/{}/items", board.id))
+        .body(Body::empty())
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let items: Vec<BoardItem> = serde_json::from_slice(&resp.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    assert_eq!(items.len(), 5);
+
+    // 8. Test fallback metadata when a board item references a missing entity
+    {
+        let conn = _state.pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO board_items (board_id, entity_type, entity_id, note_text, pos_x, pos_y, width, height, z_index, color, created_at)
+             VALUES (?1, 'prompt', 999999, NULL, 0, 0, 240, 160, 0, NULL, datetime('now'))",
+            rusqlite::params![board.id],
+        ).unwrap();
+    }
+
+    // Re-fetch board items: orphan item should have fallback title/subtitle
+    let req = Request::builder()
+        .method("GET")
+        .uri(format!("/api/boards/{}/items", board.id))
+        .body(Body::empty())
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let items_after: Vec<BoardItem> = serde_json::from_slice(&resp.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    let orphan_item = items_after.iter().find(|i| i.entity_id == Some(999999)).unwrap();
+    assert_eq!(orphan_item.entity_title.as_deref(), Some("Prompt #999999"));
+    assert_eq!(orphan_item.entity_subtitle.as_deref(), Some("(Referenced prompt not found)"));
+}
+

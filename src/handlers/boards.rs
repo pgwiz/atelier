@@ -265,20 +265,21 @@ pub async fn create_board_item(
     let board = get_board_by_id(&conn, id)?;
     let project_id = board.project_id.unwrap_or(1);
 
+    let entity_type = dto.entity_type.trim().to_lowercase();
     let valid_types = ["prompt", "character", "link", "note", "part"];
-    if !valid_types.contains(&dto.entity_type.as_str()) {
+    if !valid_types.contains(&entity_type.as_str()) {
         return Err(AppError::BadRequest(format!(
             "Invalid entity_type '{}'. Must be prompt, character, link, note, or part",
             dto.entity_type
         )));
     }
 
-    if dto.entity_type != "note" {
+    if entity_type != "note" {
         let eid = dto.entity_id.ok_or_else(|| {
-            AppError::BadRequest(format!("entity_id is required for entity_type '{}'", dto.entity_type))
+            AppError::BadRequest(format!("entity_id is required for entity_type '{}'", entity_type))
         })?;
 
-        let exists: bool = match dto.entity_type.as_str() {
+        let exists: bool = match entity_type.as_str() {
             "prompt" => conn
                 .query_row("SELECT EXISTS(SELECT 1 FROM prompts WHERE id = ?1)", params![eid], |r| r.get(0))
                 .unwrap_or(false),
@@ -297,7 +298,7 @@ pub async fn create_board_item(
         if !exists {
             return Err(AppError::NotFound(format!(
                 "Referenced {} with id {} does not exist",
-                dto.entity_type, eid
+                entity_type, eid
             )));
         }
     }
@@ -313,7 +314,7 @@ pub async fn create_board_item(
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, datetime('now'))",
         params![
             id,
-            dto.entity_type,
+            entity_type,
             dto.entity_id,
             dto.note_text,
             pos_x,
@@ -511,78 +512,8 @@ pub fn get_items_for_board(conn: &Connection, board_id: i64) -> Result<Vec<Board
             created_at,
         ) = r.map_err(|e| AppError::Database(e.to_string()))?;
 
-        let mut entity_title = None;
-        let mut entity_subtitle = None;
-        let mut entity_image = None;
-        let mut entity_tags = Vec::new();
-
-        if let Some(eid) = entity_id {
-            match entity_type.as_str() {
-                "prompt" => {
-                    if let Ok((title, body)) = conn.query_row(
-                        "SELECT title, body FROM prompts WHERE id = ?1",
-                        params![eid],
-                        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
-                    ) {
-                        entity_title = Some(title);
-                        let snippet = safe_truncate(&body, 100);
-                        entity_subtitle = Some(snippet);
-                        entity_tags = get_tags_for_entity(conn, "prompt", eid).unwrap_or_default();
-                    }
-                }
-                "character" => {
-                    if let Ok((name, desc, traits, img)) = conn.query_row(
-                        "SELECT name, description, traits, image_path FROM characters WHERE id = ?1",
-                        params![eid],
-                        |row| {
-                            Ok((
-                                row.get::<_, String>(0)?,
-                                row.get::<_, Option<String>>(1)?,
-                                row.get::<_, Option<String>>(2)?,
-                                row.get::<_, Option<String>>(3)?,
-                            ))
-                        },
-                    ) {
-                        entity_title = Some(name);
-                        let snippet = desc.or(traits).unwrap_or_default();
-                        let snippet_trimmed = safe_truncate(&snippet, 100);
-                        entity_subtitle = Some(snippet_trimmed);
-                        entity_image = img;
-                        entity_tags = get_tags_for_entity(conn, "character", eid).unwrap_or_default();
-                    }
-                }
-                "link" => {
-                    if let Ok((title, url, thumb)) = conn.query_row(
-                        "SELECT title, url, thumbnail_url FROM links WHERE id = ?1",
-                        params![eid],
-                        |row| {
-                            Ok((
-                                row.get::<_, Option<String>>(0)?,
-                                row.get::<_, String>(1)?,
-                                row.get::<_, Option<String>>(2)?,
-                            ))
-                        },
-                    ) {
-                        entity_title = Some(title.unwrap_or_else(|| url.clone()));
-                        entity_subtitle = Some(url);
-                        entity_image = thumb;
-                        entity_tags = get_tags_for_entity(conn, "link", eid).unwrap_or_default();
-                    }
-                }
-                "part" => {
-                    if let Ok((title, ptype, status)) = conn.query_row(
-                        "SELECT title, part_type, status FROM project_parts WHERE id = ?1",
-                        params![eid],
-                        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?)),
-                    ) {
-                        entity_title = Some(title);
-                        entity_subtitle = Some(format!("{} • {}", ptype, status));
-                        entity_tags = Vec::new();
-                    }
-                }
-                _ => {}
-            }
-        }
+        let (entity_title, entity_subtitle, entity_image, entity_tags) =
+            enrich_board_item_metadata(conn, &entity_type, entity_id);
 
         items.push(BoardItem {
             id,
@@ -605,6 +536,102 @@ pub fn get_items_for_board(conn: &Connection, board_id: i64) -> Result<Vec<Board
     }
 
     Ok(items)
+}
+
+pub fn enrich_board_item_metadata(
+    conn: &Connection,
+    entity_type: &str,
+    entity_id: Option<i64>,
+) -> (Option<String>, Option<String>, Option<String>, Vec<String>) {
+    let mut entity_title = None;
+    let mut entity_subtitle = None;
+    let mut entity_image = None;
+    let mut entity_tags = Vec::new();
+
+    let norm_type = entity_type.trim().to_lowercase();
+    if let Some(eid) = entity_id {
+        match norm_type.as_str() {
+            "prompt" => {
+                if let Ok((title, body)) = conn.query_row(
+                    "SELECT title, body FROM prompts WHERE id = ?1",
+                    params![eid],
+                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+                ) {
+                    entity_title = Some(title);
+                    let snippet = safe_truncate(&body, 100);
+                    entity_subtitle = Some(snippet);
+                    entity_tags = get_tags_for_entity(conn, "prompt", eid).unwrap_or_default();
+                } else {
+                    entity_title = Some(format!("Prompt #{}", eid));
+                    entity_subtitle = Some("(Referenced prompt not found)".into());
+                }
+            }
+            "character" => {
+                if let Ok((name, desc, traits, img)) = conn.query_row(
+                    "SELECT name, description, traits, image_path FROM characters WHERE id = ?1",
+                    params![eid],
+                    |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, Option<String>>(1)?,
+                            row.get::<_, Option<String>>(2)?,
+                            row.get::<_, Option<String>>(3)?,
+                        ))
+                    },
+                ) {
+                    entity_title = Some(name);
+                    let snippet = desc.or(traits).unwrap_or_default();
+                    let snippet_trimmed = safe_truncate(&snippet, 100);
+                    entity_subtitle = Some(snippet_trimmed);
+                    entity_image = img;
+                    entity_tags = get_tags_for_entity(conn, "character", eid).unwrap_or_default();
+                } else {
+                    entity_title = Some(format!("Character #{}", eid));
+                    entity_subtitle = Some("(Referenced character not found)".into());
+                }
+            }
+            "link" => {
+                if let Ok((title, url, thumb)) = conn.query_row(
+                    "SELECT title, url, thumbnail_url FROM links WHERE id = ?1",
+                    params![eid],
+                    |row| {
+                        Ok((
+                            row.get::<_, Option<String>>(0)?,
+                            row.get::<_, String>(1)?,
+                            row.get::<_, Option<String>>(2)?,
+                        ))
+                    },
+                ) {
+                    entity_title = Some(title.unwrap_or_else(|| url.clone()));
+                    entity_subtitle = Some(url);
+                    entity_image = thumb;
+                    entity_tags = get_tags_for_entity(conn, "link", eid).unwrap_or_default();
+                } else {
+                    entity_title = Some(format!("Link #{}", eid));
+                    entity_subtitle = Some("(Referenced link not found)".into());
+                }
+            }
+            "part" => {
+                if let Ok((title, ptype, status)) = conn.query_row(
+                    "SELECT title, part_type, status FROM project_parts WHERE id = ?1",
+                    params![eid],
+                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?)),
+                ) {
+                    entity_title = Some(title);
+                    entity_subtitle = Some(format!("{} • {}", ptype, status));
+                    entity_tags = get_tags_for_entity(conn, "part", eid).unwrap_or_default();
+                } else {
+                    entity_title = Some(format!("Part #{}", eid));
+                    entity_subtitle = Some("(Referenced part not found)".into());
+                }
+            }
+            _ => {}
+        }
+    } else if norm_type == "note" {
+        entity_title = Some("Sticky Note".into());
+    }
+
+    (entity_title, entity_subtitle, entity_image, entity_tags)
 }
 
 pub fn get_board_item_by_id(conn: &Connection, item_id: i64) -> Result<BoardItem, AppError> {
@@ -656,74 +683,8 @@ pub fn get_board_item_by_id(conn: &Connection, item_id: i64) -> Result<BoardItem
         created_at,
     ) = item_tuple;
 
-    let mut entity_title = None;
-    let mut entity_subtitle = None;
-    let mut entity_image = None;
-    let mut entity_tags = Vec::new();
-
-    if let Some(eid) = entity_id {
-        match entity_type.as_str() {
-            "prompt" => {
-                if let Ok((title, body)) = conn.query_row(
-                    "SELECT title, body FROM prompts WHERE id = ?1",
-                    params![eid],
-                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
-                ) {
-                    entity_title = Some(title);
-                    entity_subtitle = Some(safe_truncate(&body, 100));
-                    entity_tags = get_tags_for_entity(conn, "prompt", eid).unwrap_or_default();
-                }
-            }
-            "character" => {
-                if let Ok((name, desc, img)) = conn.query_row(
-                    "SELECT name, description, image_path FROM characters WHERE id = ?1",
-                    params![eid],
-                    |row| {
-                        Ok((
-                            row.get::<_, String>(0)?,
-                            row.get::<_, Option<String>>(1)?,
-                            row.get::<_, Option<String>>(2)?,
-                        ))
-                    },
-                ) {
-                    entity_title = Some(name);
-                    entity_subtitle = desc.map(|d| safe_truncate(&d, 100));
-                    entity_image = img;
-                    entity_tags = get_tags_for_entity(conn, "character", eid).unwrap_or_default();
-                }
-            }
-            "link" => {
-                if let Ok((title, url, thumb)) = conn.query_row(
-                    "SELECT title, url, thumbnail_url FROM links WHERE id = ?1",
-                    params![eid],
-                    |row| {
-                        Ok((
-                            row.get::<_, Option<String>>(0)?,
-                            row.get::<_, String>(1)?,
-                            row.get::<_, Option<String>>(2)?,
-                        ))
-                    },
-                ) {
-                    entity_title = Some(title.unwrap_or_else(|| url.clone()));
-                    entity_subtitle = Some(url);
-                    entity_image = thumb;
-                    entity_tags = get_tags_for_entity(conn, "link", eid).unwrap_or_default();
-                }
-            }
-            "part" => {
-                if let Ok((title, ptype, status)) = conn.query_row(
-                    "SELECT title, part_type, status FROM project_parts WHERE id = ?1",
-                    params![eid],
-                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?)),
-                ) {
-                    entity_title = Some(title);
-                    entity_subtitle = Some(format!("{} • {}", ptype, status));
-                    entity_tags = Vec::new();
-                }
-            }
-            _ => {}
-        }
-    }
+    let (entity_title, entity_subtitle, entity_image, entity_tags) =
+        enrich_board_item_metadata(conn, &entity_type, entity_id);
 
     Ok(BoardItem {
         id,

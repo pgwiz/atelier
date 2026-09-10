@@ -44,6 +44,11 @@ Atelier is a local-only, single-user content sketchbook and visual planning canv
   - Cyberpunk Chamfered Futuristic Edges (`clip-path: polygon(...)` bounded within 8px) with tech corner notches.
   - Configurable solid-color ambient background fade animation (Crimson Red `#dc2626` preset, speed, intensity, 100% zero gradients).
   - Canvas Overhaul: Dynamic contextual cursors (`crosshair`, `text`, `cell`, `move`, `se-resize`), seamless inline floating text editor (no browser `prompt()`), and dragging/moving for selected SVG shapes, text, and strokes.
+  - Planning Board Reliability (v0.4.1):
+    - Unified metadata enrichment (`enrich_board_item_metadata`) in backend joins `entity_title`, `entity_subtitle`, `entity_image`, `entity_tags` across all board items with fallback titles (`Prompt #ID`, `Character #ID`, etc.).
+    - Robust frontend fallbacks in `createCardElement` with entity-specific CSS classes (`.card-prompt`, `.card-character`, `.card-link`, `.card-part`, `.card-note`), 3px solid top borders, distinct badges, line-clamped snippets, and enforced `min-width: 200px; min-height: 120px;`.
+    - SVG floating text disappearance fix: eliminated browser GPU compositor failure by removing `filter: drop-shadow(...)` on child elements within the 100,000px SVG layer. Implemented dedicated `<g id="svg-selection-group">` with vector dashed outline, `dominant-baseline="hanging"`, in-place editing, and empty commit pruning.
+    - Floating text interaction stability: added complete event bubbling isolation (`stopPropagation` on pointerdown, pointerup, mousedown, click, dblclick) to inline text editor so clicks inside textarea never bubble to canvas stage. Added pending text commit guard, real-time zoom/pan camera tracking in `applyTransform`, multi-line SVG `<tspan>` formatting, and transparent 10px hit-expansion stroke for effortless selection and dragging.
 
 ## Key Rules & Invariants
 - **Markdown file restriction**: Exactly 4 markdown files permitted in the repository: `README.md`, `changelog.md`, `memory.md`, and `agent.md`.
@@ -61,7 +66,7 @@ Atelier is a local-only, single-user content sketchbook and visual planning canv
 - **Deep Copy & Merge Remapping**: Board items referencing parts (`entity_type == "part"`) are remapped to new part IDs during copy and merge operations.
 
 ## Verification Status
-- Integration test suite in `tests/api_tests.rs` with 27 comprehensive tests (100% passing, 0 warnings, 0 failures):
+- Integration test suite in `tests/api_tests.rs` with 28 comprehensive tests (100% passing, 0 warnings, 0 failures):
   - `test_prompts_crud_and_tags`
   - `test_characters_crud_and_linkage`
   - `test_links_and_tags`
@@ -89,4 +94,5 @@ Atelier is a local-only, single-user content sketchbook and visual planning canv
   - `test_phase10_settings_crud_and_bulk`
   - `test_phase10_project_activity_feed`
   - `test_phase10_ai_proxy_validation`
+  - `test_board_items_metadata_enrichment_and_fallbacks`
 

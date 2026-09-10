@@ -63,6 +63,7 @@ class AtelierCanvas {
     this.svgDrawingGroup = document.getElementById('svg-drawing-group');
     this.svgTextGroup = document.getElementById('svg-text-group');
     this.svgActiveStrokeGroup = document.getElementById('svg-active-stroke-group');
+    this.svgSelectionGroup = document.getElementById('svg-selection-group');
 
     this.zoomIndicator = document.getElementById('zoom-indicator');
     this.boardTitle = document.getElementById('canvas-board-name');
@@ -118,6 +119,35 @@ class AtelierCanvas {
         document.querySelectorAll('#canvas-palette .color-dot').forEach((d) => d.classList.remove('active'));
         dot.classList.add('active');
         this.currentColor = dot.dataset.color;
+
+        // If an SVG element is currently selected, update its color
+        if (this.selectedElement) {
+          const elem = this.drawingData.find((d) => d.id === this.selectedElement);
+          if (elem) {
+            elem.color = this.currentColor;
+            this.renderDrawingElements();
+            this.renderSvgSelectionOutline();
+            this.debounceSaveDrawing();
+          }
+        }
+
+        // If a card is currently selected, update its color
+        if (this.selectedCardId) {
+          const card = this.items.find((i) => i.id === this.selectedCardId);
+          if (card) {
+            card.color = this.currentColor;
+            const cardEl = document.getElementById(`card-${card.id}`);
+            if (cardEl) {
+              if (card.entity_type === 'note') {
+                cardEl.style.backgroundColor = card.color;
+              } else {
+                cardEl.style.borderColor = card.color;
+                cardEl.style.borderTopColor = card.color;
+              }
+            }
+            this.saveCardColor(card);
+          }
+        }
       });
     });
 
@@ -298,6 +328,14 @@ class AtelierCanvas {
     this.world.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.zoom})`;
     if (this.zoomIndicator) {
       this.zoomIndicator.textContent = `${Math.round(this.zoom * 100)}%`;
+    }
+    if (this.activeInlineEditor && this.activeInlineEditor.editor) {
+      const screenPos = this.worldToScreen(this.activeInlineEditor.worldX, this.activeInlineEditor.worldY);
+      const rect = this.viewport.getBoundingClientRect();
+      this.activeInlineEditor.editor.style.left = `${screenPos.x - rect.left - 6}px`;
+      this.activeInlineEditor.editor.style.top = `${screenPos.y - rect.top - 4}px`;
+      const fontSize = Math.max(12, Math.round(18 * this.zoom));
+      this.activeInlineEditor.editor.style.fontSize = `${fontSize}px`;
     }
     this.debounceSaveCamera();
   }
@@ -510,6 +548,15 @@ class AtelierCanvas {
       this.isDrawing = true;
       this.activeShapeStart = worldPos;
     } else if (this.currentTool === 'text') {
+      const targetText = e.target.closest('#canvas-svg text');
+      if (targetText && targetText.id) {
+        const elem = this.drawingData.find((d) => d.id === targetText.id);
+        if (elem) {
+          this.promptForText(elem.x, elem.y, elem);
+          this.setTool('select');
+          return;
+        }
+      }
       this.promptForText(worldPos.x, worldPos.y);
       this.setTool('select');
     }
@@ -726,19 +773,22 @@ class AtelierCanvas {
 
   createCardElement(item) {
     const el = document.createElement('div');
-    el.className = `board-card ${item.entity_type === 'note' ? 'sticky-note' : ''}`;
+    const rawType = (item.entity_type || 'note').toLowerCase();
+    const entityType = ['prompt', 'character', 'link', 'part', 'note'].includes(rawType) ? rawType : 'note';
+    el.className = `board-card card-${entityType} ${entityType === 'note' ? 'sticky-note' : ''}`;
     el.id = `card-${item.id}`;
     el.style.left = `${item.pos_x}px`;
     el.style.top = `${item.pos_y}px`;
-    el.style.width = `${item.width}px`;
-    el.style.height = `${item.height}px`;
-    el.style.zIndex = `${item.z_index}`;
+    el.style.width = `${Math.max(item.width || 240, 200)}px`;
+    el.style.height = `${Math.max(item.height || 160, 120)}px`;
+    el.style.zIndex = `${item.z_index || 1}`;
 
     if (item.color) {
-      if (item.entity_type === 'note') {
+      if (entityType === 'note') {
         el.style.backgroundColor = item.color;
       } else {
         el.style.borderColor = item.color;
+        el.style.borderTopColor = item.color;
       }
     }
 
@@ -764,18 +814,21 @@ class AtelierCanvas {
     typeBadge.className = 'board-card-type-badge';
     const cIcon = document.createElement('i');
     let iconClass = 'fa-note-sticky';
-    if (item.entity_type === 'prompt') iconClass = 'fa-feather-pointed';
-    else if (item.entity_type === 'character') iconClass = 'fa-users';
-    else if (item.entity_type === 'link') iconClass = 'fa-link';
-    else if (item.entity_type === 'part') iconClass = 'fa-film';
+    if (entityType === 'prompt') iconClass = 'fa-feather-pointed';
+    else if (entityType === 'character') iconClass = 'fa-users';
+    else if (entityType === 'link') iconClass = 'fa-link';
+    else if (entityType === 'part') iconClass = 'fa-film';
     cIcon.className = `fa-solid ${iconClass}`;
     typeBadge.appendChild(cIcon);
-    typeBadge.appendChild(document.createTextNode(` ${item.entity_type}`));
+    typeBadge.appendChild(document.createTextNode(` ${entityType}`));
     header.appendChild(typeBadge);
 
+    const fallbackTitle = entityType === 'note' ? 'Sticky Note' : `${entityType.charAt(0).toUpperCase() + entityType.slice(1)} #${item.entity_id || item.id}`;
+    const resolvedTitle = item.entity_title || item.title || fallbackTitle;
     const titleSpan = document.createElement('span');
     titleSpan.className = 'board-card-title';
-    titleSpan.textContent = item.entity_title || (item.entity_type === 'note' ? 'Sticky Note' : 'Card');
+    titleSpan.textContent = resolvedTitle;
+    titleSpan.title = resolvedTitle;
     header.appendChild(titleSpan);
 
     const delBtn = document.createElement('button');
@@ -793,7 +846,7 @@ class AtelierCanvas {
     const body = document.createElement('div');
     body.className = 'board-card-body';
 
-    if (item.entity_type === 'note') {
+    if (entityType === 'note') {
       const textarea = document.createElement('textarea');
       textarea.className = 'sticky-textarea';
       textarea.value = item.note_text || '';
@@ -804,25 +857,28 @@ class AtelierCanvas {
       });
       body.appendChild(textarea);
     } else {
-      if (item.entity_image) {
+      const resolvedImage = item.entity_image || item.image || item.image_path || item.thumbnail_url || null;
+      if (resolvedImage) {
         const img = document.createElement('img');
         img.className = 'board-card-img';
-        img.src = item.entity_image;
+        img.src = resolvedImage;
+        img.alt = resolvedTitle;
         img.loading = 'lazy';
         body.appendChild(img);
       }
       let pSubtitle = null;
-      if (item.entity_subtitle) {
+      const resolvedSubtitle = item.entity_subtitle || item.snippet || item.body || item.description || '';
+      if (resolvedSubtitle) {
         pSubtitle = document.createElement('p');
-        pSubtitle.textContent = item.entity_subtitle;
+        pSubtitle.textContent = resolvedSubtitle;
         body.appendChild(pSubtitle);
       }
-      if (item.entity_type === 'part' && item.entity_id) {
+      if (entityType === 'part' && item.entity_id) {
         const statusPill = document.createElement('button');
         statusPill.type = 'button';
         let currentStatus = 'Draft';
-        if (item.entity_subtitle && item.entity_subtitle.includes('\u2022')) {
-          currentStatus = item.entity_subtitle.split('\u2022')[1].trim();
+        if (resolvedSubtitle && resolvedSubtitle.includes('\u2022')) {
+          currentStatus = resolvedSubtitle.split('\u2022')[1].trim();
         }
         const statusSlug = currentStatus.toLowerCase().replace(/\s+/g, '-');
         statusPill.className = `part-status-badge badge-status-${statusSlug}`;
@@ -845,10 +901,11 @@ class AtelierCanvas {
               const nextSlug = nextStatus.toLowerCase().replace(/\s+/g, '-');
               statusPill.className = `part-status-badge badge-status-${nextSlug}`;
               statusPill.innerHTML = `<i class="fa-solid fa-circle-dot"></i> ${nextStatus}`;
-              if (item.entity_subtitle && pSubtitle) {
-                const parts = item.entity_subtitle.split('\u2022');
-                item.entity_subtitle = `${parts[0].trim()} \u2022 ${nextStatus}`;
-                pSubtitle.textContent = item.entity_subtitle;
+              if (resolvedSubtitle && pSubtitle) {
+                const parts = resolvedSubtitle.split('\u2022');
+                const updatedSub = `${parts[0].trim()} \u2022 ${nextStatus}`;
+                item.entity_subtitle = updatedSub;
+                pSubtitle.textContent = updatedSub;
               }
               if (typeof showToast === 'function') {
                 showToast(`Part updated to ${nextStatus}`);
@@ -863,10 +920,11 @@ class AtelierCanvas {
         });
         body.appendChild(statusPill);
       }
-      if (item.entity_tags && item.entity_tags.length > 0) {
+      const rawTags = Array.isArray(item.entity_tags) ? item.entity_tags : (Array.isArray(item.tags) ? item.tags : []);
+      if (rawTags.length > 0) {
         const tagsWrap = document.createElement('div');
         tagsWrap.className = 'tags-list';
-        for (const t of item.entity_tags.slice(0, 3)) {
+        for (const t of rawTags.slice(0, 3)) {
           const chip = document.createElement('span');
           chip.className = 'tag-chip';
           chip.textContent = `#${t}`;
@@ -957,11 +1015,22 @@ class AtelierCanvas {
 
   pinEntityAt(entityType, entityId, posX, posY) {
     if (!this.board) return;
+
+    let targetX = posX;
+    let targetY = posY;
+    if (targetX === undefined || targetY === undefined) {
+      const rect = this.viewport ? this.viewport.getBoundingClientRect() : { width: 800, height: 600, left: 0, top: 0 };
+      const centerWorld = this.screenToWorld(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      const offset = (this.items.length % 6) * 24;
+      targetX = centerWorld.x - 120 + offset;
+      targetY = centerWorld.y - 80 + offset;
+    }
+
     const payload = {
       entity_type: entityType,
       entity_id: entityId,
-      pos_x: posX,
-      pos_y: posY,
+      pos_x: Math.round(targetX),
+      pos_y: Math.round(targetY),
       width: 240,
       height: 160,
     };
@@ -1109,6 +1178,10 @@ class AtelierCanvas {
         this.renderTextElement(elem);
       }
     }
+
+    if (this.selectedElement) {
+      this.renderSvgSelectionOutline();
+    }
   }
 
   renderStrokeElement(elem) {
@@ -1216,12 +1289,39 @@ class AtelierCanvas {
     text.setAttribute('font-size', '18px');
     text.setAttribute('font-weight', '600');
     text.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
-    text.textContent = elem.text || '';
+    text.setAttribute('dominant-baseline', 'hanging');
+    text.setAttribute('stroke', 'transparent');
+    text.setAttribute('stroke-width', '10px');
+    text.setAttribute('paint-order', 'stroke fill');
     text.id = elem.id;
+    text.style.cursor = 'pointer';
+    text.style.userSelect = 'none';
+
+    const lines = (elem.text || '').split('\n');
+    if (lines.length <= 1) {
+      text.textContent = elem.text || '';
+    } else {
+      text.textContent = '';
+      lines.forEach((line, i) => {
+        const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+        tspan.setAttribute('x', elem.x);
+        tspan.setAttribute('dy', i === 0 ? '0' : '1.3em');
+        tspan.textContent = line || ' ';
+        text.appendChild(tspan);
+      });
+    }
+
+    text.addEventListener('pointerdown', (e) => {
+      if (this.currentTool === 'text') {
+        e.stopPropagation();
+        this.promptForText(elem.x, elem.y, elem);
+        this.setTool('select');
+      }
+    });
 
     text.addEventListener('click', (e) => {
+      e.stopPropagation();
       if (this.currentTool === 'select') {
-        e.stopPropagation();
         this.selectSvgElement(elem.id);
       }
     });
@@ -1287,7 +1387,13 @@ class AtelierCanvas {
   }
 
   promptForText(x, y, existingElem = null) {
-    // Seamless inline canvas editor (replaces browser prompt)
+    // Commit any currently open editor before opening a new one
+    if (this.activeInlineEditor) {
+      this.activeInlineEditor.commit();
+      this.activeInlineEditor = null;
+    }
+
+    // Clean up any remaining editor DOM nodes
     document.querySelectorAll('.canvas-inline-editor').forEach((el) => el.remove());
 
     const editor = document.createElement('textarea');
@@ -1297,13 +1403,36 @@ class AtelierCanvas {
 
     const screenPos = this.worldToScreen(x, y);
     const rect = this.viewport.getBoundingClientRect();
-    editor.style.left = `${screenPos.x - rect.left}px`;
-    editor.style.top = `${screenPos.y - rect.top}px`;
+    editor.style.left = `${screenPos.x - rect.left - 6}px`;
+    editor.style.top = `${screenPos.y - rect.top - 4}px`;
+    const fontSize = Math.max(12, Math.round(18 * this.zoom));
+    editor.style.fontSize = `${fontSize}px`;
+    editor.style.lineHeight = '1.3';
+
+    const adjustSize = () => {
+      editor.style.height = 'auto';
+      editor.style.height = `${Math.max(38, editor.scrollHeight)}px`;
+      const val = editor.value || '';
+      const lines = val.split('\n');
+      const longestLine = lines.reduce((max, l) => Math.max(max, l.length), 0);
+      const charWidth = Math.max(8, Math.round(11 * this.zoom));
+      const approxWidth = Math.max(140, Math.min(600, (longestLine + 3) * charWidth));
+      editor.style.width = `${approxWidth}px`;
+    };
+    editor.addEventListener('input', adjustSize);
+
+    // Stop events inside the editor from bubbling to canvas stage
+    editor.addEventListener('pointerdown', (e) => e.stopPropagation());
+    editor.addEventListener('pointerup', (e) => e.stopPropagation());
+    editor.addEventListener('mousedown', (e) => e.stopPropagation());
+    editor.addEventListener('click', (e) => e.stopPropagation());
+    editor.addEventListener('dblclick', (e) => e.stopPropagation());
 
     let committed = false;
     const commit = () => {
       if (committed) return;
       committed = true;
+      this.activeInlineEditor = null;
       const text = editor.value.trim();
       editor.remove();
 
@@ -1311,6 +1440,7 @@ class AtelierCanvas {
         if (existingElem) {
           existingElem.text = text;
           this.renderDrawingElements();
+          this.selectSvgElement(existingElem.id);
           this.debounceSaveDrawing();
         } else {
           const labelElem = {
@@ -1322,8 +1452,24 @@ class AtelierCanvas {
             color: this.currentColor,
           };
           this.pushDrawingElement(labelElem);
+          this.selectSvgElement(labelElem.id);
+        }
+      } else if (existingElem) {
+        const idx = this.drawingData.findIndex((e) => e.id === existingElem.id);
+        if (idx !== -1) {
+          this.drawingData.splice(idx, 1);
+          this.renderDrawingElements();
+          this.deselectSvgElement();
+          this.debounceSaveDrawing();
         }
       }
+    };
+
+    this.activeInlineEditor = {
+      editor,
+      worldX: x,
+      worldY: y,
+      commit,
     };
 
     editor.addEventListener('keydown', (e) => {
@@ -1332,7 +1478,12 @@ class AtelierCanvas {
         commit();
       } else if (e.key === 'Escape') {
         committed = true;
+        this.activeInlineEditor = null;
         editor.remove();
+        if (existingElem) {
+          this.renderDrawingElements();
+          this.selectSvgElement(existingElem.id);
+        }
       }
     });
 
@@ -1341,33 +1492,107 @@ class AtelierCanvas {
     });
 
     this.viewport.appendChild(editor);
-    setTimeout(() => editor.focus(), 20);
+    adjustSize();
+    setTimeout(() => {
+      editor.focus();
+      if (existingElem) {
+        editor.select();
+      }
+    }, 25);
   }
 
   // Selection & History
   selectSvgElement(elementId) {
     this.selectedElement = elementId;
     this.deselectCard();
-
-    // Reset styles on all SVG elements
-    this.svg.querySelectorAll('path, rect, ellipse, text').forEach((el) => {
-      el.style.stroke = '';
-      el.style.filter = '';
-    });
-
-    const el = document.getElementById(elementId);
-    if (el) {
-      el.style.stroke = '#ec4899';
-      el.style.filter = 'drop-shadow(0 0 4px #ec4899)';
-    }
+    this.renderSvgSelectionOutline();
   }
 
   deselectSvgElement() {
     this.selectedElement = null;
-    this.svg.querySelectorAll('path, rect, ellipse, text').forEach((el) => {
-      el.style.stroke = '';
-      el.style.filter = '';
-    });
+    if (this.svgSelectionGroup) {
+      this.svgSelectionGroup.innerHTML = '';
+    }
+  }
+
+  renderSvgSelectionOutline() {
+    if (!this.svgSelectionGroup) return;
+    this.svgSelectionGroup.innerHTML = '';
+    if (!this.selectedElement) return;
+
+    const elem = this.drawingData.find((d) => d.id === this.selectedElement);
+    if (!elem) return;
+
+    if (elem.type === 'rect') {
+      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.setAttribute('x', elem.x - 3);
+      rect.setAttribute('y', elem.y - 3);
+      rect.setAttribute('width', elem.w + 6);
+      rect.setAttribute('height', elem.h + 6);
+      rect.setAttribute('rx', 4);
+      rect.setAttribute('class', 'svg-selection-outline');
+      this.svgSelectionGroup.appendChild(rect);
+    } else if (elem.type === 'ellipse') {
+      const ell = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+      ell.setAttribute('cx', elem.cx);
+      ell.setAttribute('cy', elem.cy);
+      ell.setAttribute('rx', elem.rx + 3);
+      ell.setAttribute('ry', elem.ry + 3);
+      ell.setAttribute('class', 'svg-selection-outline');
+      this.svgSelectionGroup.appendChild(ell);
+    } else if (elem.type === 'stroke' && elem.points && elem.points.length > 0) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const pt of elem.points) {
+        minX = Math.min(minX, pt.x);
+        minY = Math.min(minY, pt.y);
+        maxX = Math.max(maxX, pt.x);
+        maxY = Math.max(maxY, pt.y);
+      }
+      const pad = (elem.width || 2) + 4;
+      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.setAttribute('x', minX - pad);
+      rect.setAttribute('y', minY - pad);
+      rect.setAttribute('width', Math.max(12, maxX - minX + pad * 2));
+      rect.setAttribute('height', Math.max(12, maxY - minY + pad * 2));
+      rect.setAttribute('rx', 4);
+      rect.setAttribute('class', 'svg-selection-outline');
+      this.svgSelectionGroup.appendChild(rect);
+    } else if (elem.type === 'text') {
+      const textEl = document.getElementById(elem.id);
+      let bbox = null;
+      if (textEl) {
+        try {
+          bbox = textEl.getBBox();
+        } catch (_) {}
+      }
+      const lines = (elem.text || '').split('\n');
+      const maxLineLen = Math.max(...lines.map((l) => l.length), 4);
+      const lineCount = lines.length;
+
+      const x = (bbox && bbox.width > 0) ? bbox.x - 4 : elem.x - 4;
+      const y = (bbox && bbox.height > 0) ? bbox.y - 3 : elem.y - 3;
+      const w = (bbox && bbox.width > 0) ? bbox.width + 8 : Math.max(40, maxLineLen * 11 + 10);
+      const h = (bbox && bbox.height > 0) ? bbox.height + 6 : Math.max(26, lineCount * 24 + 4);
+
+      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.setAttribute('x', x);
+      rect.setAttribute('y', y);
+      rect.setAttribute('width', w);
+      rect.setAttribute('height', h);
+      rect.setAttribute('rx', 4);
+      rect.setAttribute('class', 'svg-selection-outline');
+      this.svgSelectionGroup.appendChild(rect);
+    } else if (elem.type === 'connector') {
+      const connEl = document.getElementById(elem.id);
+      if (connEl) {
+        const clone = connEl.cloneNode(true);
+        clone.removeAttribute('id');
+        clone.setAttribute('class', 'svg-selection-outline');
+        clone.setAttribute('stroke-width', (elem.width || 2) + 2);
+        clone.removeAttribute('marker-end');
+        this.svgSelectionGroup.appendChild(clone);
+      }
+    }
   }
 
   pushDrawingElement(elem) {
@@ -1518,6 +1743,17 @@ class AtelierCanvas {
         height: card.height,
       }),
     }).catch((err) => console.error('Failed to save card dimensions', err));
+  }
+
+  saveCardColor(card) {
+    if (!this.board) return;
+    fetch(`/api/boards/${this.board.id}/items/${card.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        color: card.color,
+      }),
+    }).catch((err) => console.error('Failed to save card color', err));
   }
 
   debounceSaveNoteText(card) {

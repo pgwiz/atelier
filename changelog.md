@@ -2,6 +2,27 @@
 
 All notable changes to Atelier will be documented in this file.
 
+## [0.4.1] - 2026-09-10
+
+### Fixed & Hardened
+- **Planning Board Non-Sticky Cards Visibility & Metadata Enrichment**:
+  - Fixed issue where only sticky notes were visible on the planning canvas while prompt, character, link, and part cards remained invisible or unstyled.
+  - Implemented `enrich_board_item_metadata` in `src/handlers/boards.rs` to reliably join and serve `entity_title`, `entity_subtitle`, `entity_image`, and `entity_tags` across both `get_items_for_board` and `get_board_item_by_id`, with automatic fallback titles and subtitles if an entity reference is missing.
+  - Added robust property fallback chains in `static/canvas.js` (`createCardElement`) resolving `entity_title || title`, `entity_subtitle || snippet || body || description`, `entity_image || image || thumbnail_url`, and safe array handling for tags.
+  - Added type-specific CSS classes (`.card-prompt`, `.card-character`, `.card-link`, `.card-part`, `.card-note`) with distinct 3px solid top accents, themed badges, line-clamped snippets, and enforced `min-width: 200px; min-height: 120px;` so cards are prominently visible on any backdrop.
+  - Unified library drawer and drag-and-drop pinning via `atelierCanvas.pinEntityAt(type, id)`.
+- **Canvas Floating Text Selection & Disappearance Fix**:
+  - Eliminated browser GPU tile clipping / rasterizer failure where clicking text caused it to completely disappear. Root cause: CSS `filter: drop-shadow(...)` applied on child elements inside a 100,000px SVG layer caused Chromium/Edge Skia rasterization to fail.
+  - Removed `filter: drop-shadow(...)` entirely from SVG selection. Introduced `<g id="svg-selection-group">` with crisp dashed pink outline (`.svg-selection-outline`) for vector shapes and text.
+  - Resolved secondary root cause of disappearing text: clicking inside the inline textarea triggered un-stopped `pointerdown` events bubbling to `#canvas-stage-wrapper`, causing `handlePointerDown` to either re-invoke `promptForText` (which removed the editor) or deselect. Added full event bubbling isolation (`stopPropagation` on `pointerdown`, `pointerup`, `mousedown`, `click`, `dblclick`) to the inline editor.
+  - Added pending text commit protection: when an inline editor is already active, any subsequent canvas click or tool switch commits the pending text instead of discarding it.
+  - Added camera tracking for active inline text editing: `applyTransform` keeps the active inline editor anchored and scaled during camera zoom and pan.
+  - Added multi-line text support in SVG using `<tspan>` with line-height relative positioning (`dy="1.3em"`), expanded text hit-testing via invisible 10px stroke (`paint-order: stroke fill; stroke: transparent;`), and multi-line selection bounding box fallback.
+  - Set `dominant-baseline="hanging"` on `<text>` elements and aligned inline text editor coordinates directly to world-to-screen hanging baseline.
+  - Added single-click selection, double-click in-place editing with pre-filled selection, auto-resizing inline editor, and clean deletion on empty commit.
+  - Enabled active color dot updates for selected SVG elements and cards.
+  - Added integration test `test_board_items_metadata_enrichment_and_fallbacks` covering multi-entity pinning, tag joining, and fallback metadata (28 passing tests in total).
+
 ## [0.4.0] - 2026-09-10
 
 ### Added

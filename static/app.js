@@ -3173,40 +3173,8 @@ function renderDrawerItems() {
 }
 
 async function pinItemToBoard(entityType, entityId) {
-  if (!state.activeBoardId) return;
-
-  // Place card near canvas center
-  const centerWorld = window.atelierCanvas.screenToWorld(
-    window.innerWidth / 2,
-    window.innerHeight / 2
-  );
-
-  const payload = {
-    entity_type: entityType,
-    entity_id: entityId,
-    pos_x: centerWorld.x - 120,
-    pos_y: centerWorld.y - 80,
-    width: 240,
-    height: 160,
-  };
-
-  try {
-    const res = await fetch(`/api/boards/${state.activeBoardId}/items`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const createdItem = await res.json();
-
-    window.atelierCanvas.items.push(createdItem);
-    window.atelierCanvas.renderCards();
-    window.atelierCanvas.selectCard(createdItem.id);
-    showToast(`Pinned ${entityType} to canvas`);
-  } catch (err) {
-    console.error('Failed to pin item', err);
-    showToast('Failed to pin item to board', 'error');
-  }
+  if (!state.activeBoardId || !window.atelierCanvas) return;
+  window.atelierCanvas.pinEntityAt(entityType, entityId);
 }
 
 // ===================================================
