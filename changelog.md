@@ -22,6 +22,9 @@ All notable changes to Atelier will be documented in this file.
   - Added single-click selection, double-click in-place editing with pre-filled selection, auto-resizing inline editor, and clean deletion on empty commit.
   - Enabled active color dot updates for selected SVG elements and cards.
   - Added integration test `test_board_items_metadata_enrichment_and_fallbacks` covering multi-entity pinning, tag joining, and fallback metadata (28 passing tests in total).
+- **View Header Actions Arrangement**:
+  - Styled `.header-actions` across all views with `display: flex; flex-direction: row; align-items: center; gap: 0.65rem; white-space: nowrap;` and vertically centered items in `.view-header`.
+  - Arranged "New Project" and "Import Package" neatly side-by-side on a single row with balanced button proportions and proper vertical centering.
 - **Documentation & Repository Memory Compaction**:
   - Consolidated and updated repository truth across `README.md`, `agent.md`, `memory.md`, and `changelog.md`.
   - Re-aligned Project Structure tree, SQLite schema migrations (`settings`), and API specifications (`GET /api/projects/:id/activity`, `GET/PUT/POST /api/settings`, `POST /api/ai/chat`).

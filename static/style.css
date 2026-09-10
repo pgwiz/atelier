@@ -518,10 +518,16 @@ code, .code-font {
 
 .view-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   margin-bottom: 1.5rem;
-  gap: 1rem;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.header-left {
+  flex: 1;
+  min-width: 260px;
 }
 
 .view-header h2 {
@@ -529,12 +535,28 @@ code, .code-font {
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--text-primary);
+  margin: 0;
 }
 
 .section-desc {
   font-size: 0.88rem;
   color: var(--text-secondary);
   margin-top: 0.25rem;
+  line-height: 1.4;
+}
+
+.header-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.65rem;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.header-actions .btn {
+  margin: 0;
+  white-space: nowrap;
 }
 
 /* ===================================================
