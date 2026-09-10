@@ -13,6 +13,11 @@ All notable changes to Atelier will be documented in this file.
   - Hardened pointer event capture and gesture isolation: added `dragstart` listener prevention, pointer down isolation for floating toolbars, pointer capture (`setPointerCapture` / `releasePointerCapture`) so fast gestures never drop strokes, and `pointercancel` listener to cleanly reset drawing state if a gesture is interrupted.
   - Added safe fallback property chains (`this.currentColor || '#3b82f6'`, `this.currentStrokeWidth || 2`) across all stroke, shape, and connector preview renderers.
   - Added dynamic DOM element re-initialization in `loadBoard()` ensuring canvas SVG groups are always reliably resolved.
+  - **Right-Click Canvas / Notebook Dragging**:
+    - Enabled right mouse button (`e.button === 2`) drag for smooth panning of the notebook/canvas board across all tools.
+    - Added `contextmenu` default prevention on `#canvas-stage-wrapper` to prevent the browser context menu from interrupting right-click panning.
+    - Restricted card dragging, resizing, and connector anchors to primary left click (`e.button === 0`), allowing right-click drag anywhere across cards or background to seamlessly pan the canvas.
+    - Debounced camera save to SQLite on right-click pan release.
   - Confirmed all 28 backend integration tests pass cleanly and zero JavaScript syntax errors exist.
 
 ## [0.4.1] - 2026-09-10

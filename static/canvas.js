@@ -83,6 +83,7 @@ class AtelierCanvas {
       window.addEventListener('pointerup', (e) => this.handlePointerUp(e));
       window.addEventListener('pointercancel', (e) => this.handlePointerUp(e));
       this.viewport.addEventListener('wheel', (e) => this.handleWheel(e), { passive: false });
+      this.viewport.addEventListener('contextmenu', (e) => e.preventDefault());
 
       this.viewport.addEventListener('dragstart', (e) => {
         if (this.currentTool !== 'select') {
@@ -525,12 +526,13 @@ class AtelierCanvas {
 
   // Pointer Handling
   handlePointerDown(e) {
-    if (e.button === 1 || this.isSpacePressed) {
-      // Middle click or space pan
+    if (e.button === 1 || e.button === 2 || this.isSpacePressed) {
+      // Middle click, right click, or space pan (drag the notebook/canvas)
       this.isPanning = true;
       this.panStartX = e.clientX - this.panX;
       this.panStartY = e.clientY - this.panY;
       if (this.viewport) this.viewport.style.cursor = 'grabbing';
+      e.preventDefault();
       return;
     }
 
@@ -682,6 +684,7 @@ class AtelierCanvas {
     if (this.isPanning) {
       this.isPanning = false;
       this.updateCursor();
+      this.debounceSaveCamera();
       return;
     }
 
@@ -846,6 +849,7 @@ class AtelierCanvas {
       port.dataset.anchor = anchor;
       port.dataset.cardId = item.id;
       port.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
         e.stopPropagation();
         this.startConnectorDrag(item.id, anchor, e);
       });
@@ -985,6 +989,7 @@ class AtelierCanvas {
     const resizeHandle = document.createElement('div');
     resizeHandle.className = 'card-resize-handle';
     resizeHandle.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
       e.stopPropagation();
       this.isResizingCard = true;
       this.resizingCard = item;
@@ -1000,6 +1005,7 @@ class AtelierCanvas {
 
     // Card Selection & Dragging
     el.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return; // Only primary button drags/selects card; right-click pans notebook
       if (this.currentTool !== 'select') return;
       if (e.target.closest('.card-resize-handle') || e.target.closest('.connector-anchor') || e.target.closest('.action-icon-btn') || e.target.tagName === 'TEXTAREA') {
         return;

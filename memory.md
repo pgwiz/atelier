@@ -28,6 +28,7 @@ Atelier is a local-only, single-user content sketchbook and visual planning canv
     - SVG layer for freehand strokes (`<path>`), shapes (`<rect>`, `<ellipse>`), floating text (`<text>`), and dynamic connectors.
     - Active stroke rendering on mouse press with instant 1-point dot preview (`M x y L x+0.1 y+0.1`) and smooth expansion.
     - Pointer capture (`setPointerCapture` / `releasePointerCapture`), dragstart prevention, and pointercancel gesture cleanup.
+    - Right-click (`e.button === 2`), middle-click (`e.button === 1`), or Space+Left drag for panning/dragging the notebook canvas with `contextmenu` suppression.
     - HTML layer for draggable/resizable cards (Prompts, Characters, Links, Parts, Sticky Notes) with 3px solid top accents.
     - Smart snapping connectors dynamically track card anchors and recalculate paths on card movement.
 - **Phase 9: Projects-First Creative OS & Dual Storage**:
