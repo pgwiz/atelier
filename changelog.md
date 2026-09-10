@@ -2,6 +2,59 @@
 
 All notable changes to Atelier will be documented in this file.
 
+## [0.4.0] - 2026-09-10
+
+### Added
+- **Aesthetic Compound Popup & Modal Overhaul (All 12 Modals)**:
+  - Wrapped form controls in cohesive `.compound-panel` containers with subtle 1px borders and solid surface backgrounds.
+  - Implemented dense 2-column input grids (`.form-grid-2col`, `.form-row-dense`, `.form-input-dense`) with 6px-8px padding and 0.85rem font size for space efficiency.
+  - Added collapsible "Advanced Options / Parameters" toggle button in Prompt and Character modals with chevron indicator.
+  - Streamlined action footers with crisp Font Awesome 6 icons and right-aligned buttons.
+  - Introduced unified in-app confirmation modal (`#modal-confirm`) replacing all browser-native `confirm()` dialogs across project, part, prompt, character, link, and board deletions.
+  - Strictly enforced max 8px border-radius and zero gradients across all modals.
+- **Redesigned Project Card Display (`#view-projects`)**:
+  - Replaced cluttered multi-button rows with a prominent primary "Open Project" button navigating directly to the Project Hub.
+  - Added sleek 3-dots actions dropdown (`fa-ellipsis-vertical`) housing Edit Details, Open Folder, Reload JSON, Export ZIP, Duplicate Project, Merge Project, Transfer Workbench, and Delete Project.
+  - Interactive category stat chips (`.stat-chip-card`) for Parts, Prompts, Cast, References, and Boards allowing 1-click workspace switching and direct view navigation.
+- **Dedicated Project Hub Page (`#view-project-hub`)**:
+  - Management banner displaying active project details, lifecycle progress bar, created/updated dates, and folder path with reveal action.
+  - Clickable status pill cycling project status (`Draft` -> `In Progress` -> `Ready` -> `Done`) with immediate SQLite persistence.
+  - 5 interactive Category Directive Cards with distinctive accent color icons and live counts jumping directly into management views.
+  - "What Changed" Recent Activity Timeline powered by `/api/projects/:id/activity`, aggregating updates across all project child entities with sorting by recency, entity type, and title.
+- **Advanced Settings: AI Assistant & API Keys (`#view-settings`)**:
+  - Unified settings storage in SQLite `settings` table (`key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL`) with `/api/settings` and `/api/settings/bulk` endpoints.
+  - AI Assistant provider selector supporting OpenRouter, OpenAI, Anthropic, Google Gemini, Groq, and local Ollama.
+  - Masked API key input with show/hide eye toggle, model ID override, and custom base URL configuration.
+  - Backend proxy endpoint (`POST /api/ai/chat`) with mock test mode and offline test coverage.
+  - Real-time connection testing button (`#btn-test-ai-connection`) with visual status pills.
+  - Interface layout mode switch between Classic Left Sidebar and Futuristic Bottom Floating Dock.
+  - Cyberpunk Chamfered Edges toggle (`.chamfered-mode`) applying 6px geometric corner cuts with zero gradients and max 8px bounds.
+- **Futuristic Bottom Floating Dock & Slide-Up Drawer**:
+  - Centered bottom floating dock (`#bottom-dock`) with tooltips, view navigation, and quick AI Assistant trigger.
+  - Slide-up expandable project drawer (`#dock-expand-drawer`) showing project status, category counts, and rapid action shortcuts.
+- **Configurable Ambient Solid Background Fade Animation**:
+  - Fullscreen breathing pulse overlay (`#ambient-fade-overlay`) utilizing pure solid colors (100% zero gradients).
+  - Presets for Crimson Red (`#dc2626`), Amber (`#d97706`), Cyan (`#0284c7`), Purple (`#9333ea`), and Emerald (`#059669`) plus custom hex input.
+  - Adjustable cycle speeds (4s, 8s, 12s) and intensity slider (5% - 30%).
+- **Complete Planning Board Overhaul (`static/canvas.js` & `static/style.css`)**:
+  - Dynamic contextual mouse cursors based on active tool (`crosshair` for drawing/shapes/connectors, `text` for text, `cell` for stickies, `move` for dragging, `se-resize` for resize, `grab`/`grabbing` for panning).
+  - Seamless inline canvas text editor overlay replacing browser `prompt()` on click and supporting double-click in-place editing for existing text elements.
+  - Inline board renaming directly from header title without browser `prompt()`.
+  - Full mouse dragging/moving for selected SVG shapes, text, and strokes in select mode.
+  - Arrow key nudging for selected SVG elements and pinned cards (10px standard, 20px Shift, 1px Alt).
+
+### Fixed & Hardened
+- **Canvas Script Parsing**: Resolved fatal syntax error in `static/canvas.js` caused by an unmatched closing brace inside `handlePointerUp` that prevented the script from loading.
+- **In-App Confirmation & Prompt Dialogs**: Fixed ID mismatch in `showConfirmDialog` between JS (`btn-confirm-proceed`) and HTML (`btn-confirm-ok`), and implemented in-app `showPromptDialog` to eliminate native browser `prompt()` on project duplication and `confirm()` on media attachment deletion.
+- **Project Hub Banner & Actions**: Fixed folder path binding to `hub-project-path`, added status dot color binding to `hub-project-dot`, and wired event listeners for `btn-hub-copy-path` (clipboard copy) and `btn-hub-reveal-folder` (explorer reveal).
+- **Sidebar AI Button Trigger**: Wired `btn-sidebar-ai` in sidebar footer to open the AI Assistant slide-out drawer.
+- **Settings API & Layout Persistence**: Added POST support to `/api/settings` and enabled `PUT /api/settings/:key` calls in client layout and chamfered edge toggles, preventing 405 Method Not Allowed errors.
+- **AI Proxy Base URL Override**: Enabled custom `base_url` resolution for OpenAI, OpenRouter, Groq, and Anthropic providers in `src/handlers/ai.rs`.
+- **Modal Ergonomics**: Added auto-expansion of advanced parameter toggles when editing existing prompts and characters with configured advanced options.
+- **Zero-Emoji Compliance**: Verified 0 emojis across all project code, templates, and documentation.
+- **Zero-Gradient Enforcement**: Confirmed 0 linear or radial gradients across all stylesheets and canvases.
+- **Comprehensive API Integration Suite**: Added edge case tests in `tests/api_tests.rs` for Settings CRUD, 404 Project Activity Feed, and AI Proxy validation (27/27 integration tests passing).
+
 ## [0.3.0] - 2026-09-10
 
 ### Added

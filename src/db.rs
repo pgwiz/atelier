@@ -214,6 +214,13 @@ pub fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
 
         CREATE INDEX IF NOT EXISTS idx_attachments_project ON project_attachments(project_id);
         CREATE INDEX IF NOT EXISTS idx_attachments_part ON project_attachments(part_id);
+
+        -- Settings: key-value configuration store
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
         "
     )?;
 

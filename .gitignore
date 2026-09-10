@@ -4,3 +4,5 @@
 /data/*.db-wal
 /data/uploads/*
 !/data/uploads/.gitkeep
+/data/projects/*
+!/data/projects/.gitkeep

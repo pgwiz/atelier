@@ -41,6 +41,9 @@ class AtelierCanvas {
     this.resizingCard = null;
     this.resizeStart = { x: 0, y: 0, w: 0, h: 0 };
 
+    this.isDraggingSvg = false;
+    this.svgDragLastWorldPos = null;
+
     // Debounce timers
     this.cameraSaveTimer = null;
     this.drawingSaveTimer = null;
@@ -153,15 +156,52 @@ class AtelierCanvas {
       });
     }
 
-    // Editable title
+    // Inline editable board title (no browser prompt)
     if (this.boardTitle) {
+      this.boardTitle.title = 'Click to rename board';
       this.boardTitle.addEventListener('click', () => {
-        const newName = prompt('Rename board:', this.board?.name || '');
-        if (newName && newName.trim()) {
-          this.board.name = newName.trim();
-          this.boardTitle.textContent = this.board.name;
-          this.saveBoardSettings();
-        }
+        if (this.boardTitle.querySelector('input')) return;
+        const currentName = this.board?.name || '';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'form-input form-input-dense';
+        input.style.width = '240px';
+        input.style.display = 'inline-block';
+        input.style.fontSize = '0.95rem';
+        input.style.fontWeight = '700';
+        input.value = currentName;
+
+        this.boardTitle.textContent = '';
+        this.boardTitle.appendChild(input);
+        input.focus();
+        input.select();
+
+        let committed = false;
+        const commit = () => {
+          if (committed) return;
+          committed = true;
+          const newName = input.value.trim();
+          if (newName && newName !== currentName && this.board) {
+            this.board.name = newName;
+            this.boardTitle.textContent = newName;
+            this.saveBoardSettings();
+            if (window.showToast) window.showToast(`Board renamed to "${newName}"`);
+          } else {
+            this.boardTitle.textContent = currentName;
+          }
+        };
+
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            commit();
+          } else if (e.key === 'Escape') {
+            committed = true;
+            this.boardTitle.textContent = currentName;
+          }
+        });
+
+        input.addEventListener('blur', commit);
       });
     }
   }
@@ -197,6 +237,26 @@ class AtelierCanvas {
     if (tool !== 'select') {
       this.deselectCard();
       this.deselectSvgElement();
+    }
+    this.updateCursor();
+  }
+
+  updateCursor() {
+    if (!this.viewport) return;
+    if (this.isPanning) {
+      this.viewport.style.cursor = 'grabbing';
+    } else if (this.isSpacePressed) {
+      this.viewport.style.cursor = 'grab';
+    } else if (this.currentTool === 'pen' || this.currentTool === 'rect' || this.currentTool === 'ellipse' || this.currentTool === 'connector') {
+      this.viewport.style.cursor = 'crosshair';
+    } else if (this.currentTool === 'text') {
+      this.viewport.style.cursor = 'text';
+    } else if (this.currentTool === 'sticky') {
+      this.viewport.style.cursor = 'cell';
+    } else if (this.isDraggingSvg || this.isDraggingCard) {
+      this.viewport.style.cursor = 'move';
+    } else {
+      this.viewport.style.cursor = 'default';
     }
   }
 
@@ -326,7 +386,7 @@ class AtelierCanvas {
   }
 
   handleKeyDown(e) {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
 
     if (e.code === 'Space') {
       this.isSpacePressed = true;
@@ -345,6 +405,49 @@ class AtelierCanvas {
       this.setTool('text');
     } else if (e.key === 'n' || e.key === 'N') {
       this.setTool('sticky');
+    } else if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+      const step = e.shiftKey ? 20 : (e.altKey ? 1 : 10);
+      const dx = (e.key === 'ArrowLeft' ? -step : (e.key === 'ArrowRight' ? step : 0));
+      const dy = (e.key === 'ArrowUp' ? -step : (e.key === 'ArrowDown' ? step : 0));
+
+      if (this.selectedElement) {
+        e.preventDefault();
+        const elem = this.drawingData.find((d) => d.id === this.selectedElement);
+        if (elem) {
+          if (elem.type === 'rect' || elem.type === 'text') {
+            elem.x += dx;
+            elem.y += dy;
+          } else if (elem.type === 'ellipse') {
+            elem.cx += dx;
+            elem.cy += dy;
+          } else if (elem.type === 'stroke' && elem.points) {
+            elem.points.forEach((pt) => {
+              pt.x += dx;
+              pt.y += dy;
+            });
+          }
+          this.renderDrawingElements();
+          this.debounceSaveDrawing();
+        }
+        return;
+      }
+
+      if (this.selectedCardId) {
+        e.preventDefault();
+        const card = this.items.find((i) => i.id === this.selectedCardId);
+        if (card) {
+          card.pos_x += dx;
+          card.pos_y += dy;
+          const cardEl = document.getElementById(`card-${card.id}`);
+          if (cardEl) {
+            cardEl.style.left = `${card.pos_x}px`;
+            cardEl.style.top = `${card.pos_y}px`;
+          }
+          this.renderConnectors();
+          this.saveCardPosition(card);
+        }
+        return;
+      }
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       this.deleteSelected();
     } else if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
@@ -362,7 +465,7 @@ class AtelierCanvas {
     if (e.code === 'Space') {
       this.isSpacePressed = false;
       if (this.viewport && !this.isPanning) {
-        this.viewport.style.cursor = 'default';
+        this.updateCursor();
       }
     }
   }
@@ -383,7 +486,16 @@ class AtelierCanvas {
     const worldPos = this.screenToWorld(e.clientX, e.clientY);
 
     if (this.currentTool === 'select') {
-      if (!e.target.closest('.board-card') && !e.target.closest('path, rect, ellipse, text')) {
+      const targetSvg = e.target.closest('#canvas-svg path, #canvas-svg rect, #canvas-svg ellipse, #canvas-svg text');
+      if (targetSvg && targetSvg.id && targetSvg.id !== 'canvas-grid-pattern' && this.drawingData.some((d) => d.id === targetSvg.id)) {
+        this.selectSvgElement(targetSvg.id);
+        this.isDraggingSvg = true;
+        this.svgDragLastWorldPos = worldPos;
+        this.updateCursor();
+        return;
+      }
+
+      if (!e.target.closest('.board-card') && !targetSvg) {
         this.deselectCard();
         this.deselectSvgElement();
       }
@@ -412,6 +524,30 @@ class AtelierCanvas {
     }
 
     const worldPos = this.screenToWorld(e.clientX, e.clientY);
+
+    if (this.isDraggingSvg && this.selectedElement) {
+      const dx = worldPos.x - this.svgDragLastWorldPos.x;
+      const dy = worldPos.y - this.svgDragLastWorldPos.y;
+      this.svgDragLastWorldPos = worldPos;
+
+      const elem = this.drawingData.find((d) => d.id === this.selectedElement);
+      if (elem) {
+        if (elem.type === 'rect' || elem.type === 'text') {
+          elem.x += dx;
+          elem.y += dy;
+        } else if (elem.type === 'ellipse') {
+          elem.cx += dx;
+          elem.cy += dy;
+        } else if (elem.type === 'stroke' && elem.points) {
+          elem.points.forEach((pt) => {
+            pt.x += dx;
+            pt.y += dy;
+          });
+        }
+        this.renderDrawingElements();
+      }
+      return;
+    }
 
     if (this.isDraggingCard && this.draggedCard) {
       const newX = worldPos.x - this.dragOffset.x;
@@ -463,9 +599,14 @@ class AtelierCanvas {
   handlePointerUp(e) {
     if (this.isPanning) {
       this.isPanning = false;
-      if (this.viewport) {
-        this.viewport.style.cursor = this.isSpacePressed ? 'grab' : 'default';
-      }
+      this.updateCursor();
+      return;
+    }
+
+    if (this.isDraggingSvg) {
+      this.isDraggingSvg = false;
+      this.debounceSaveDrawing();
+      this.updateCursor();
       return;
     }
 
@@ -474,6 +615,7 @@ class AtelierCanvas {
       this.isDraggingCard = false;
       this.draggedCard = null;
       this.saveCardPosition(card);
+      this.updateCursor();
       return;
     }
 
@@ -1084,6 +1226,11 @@ class AtelierCanvas {
       }
     });
 
+    text.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      this.promptForText(elem.x, elem.y, elem);
+    });
+
     this.svgTextGroup.appendChild(text);
   }
 
@@ -1139,19 +1286,62 @@ class AtelierCanvas {
     if (this.svgActiveStrokeGroup) this.svgActiveStrokeGroup.innerHTML = '';
   }
 
-  promptForText(x, y) {
-    const text = prompt('Enter floating text label:');
-    if (text && text.trim()) {
-      const labelElem = {
-        id: 'text-' + Date.now(),
-        type: 'text',
-        x,
-        y,
-        text: text.trim(),
-        color: this.currentColor,
-      };
-      this.pushDrawingElement(labelElem);
-    }
+  promptForText(x, y, existingElem = null) {
+    // Seamless inline canvas editor (replaces browser prompt)
+    document.querySelectorAll('.canvas-inline-editor').forEach((el) => el.remove());
+
+    const editor = document.createElement('textarea');
+    editor.className = 'canvas-inline-editor';
+    editor.placeholder = 'Type text here...';
+    editor.value = existingElem ? (existingElem.text || '') : '';
+
+    const screenPos = this.worldToScreen(x, y);
+    const rect = this.viewport.getBoundingClientRect();
+    editor.style.left = `${screenPos.x - rect.left}px`;
+    editor.style.top = `${screenPos.y - rect.top}px`;
+
+    let committed = false;
+    const commit = () => {
+      if (committed) return;
+      committed = true;
+      const text = editor.value.trim();
+      editor.remove();
+
+      if (text) {
+        if (existingElem) {
+          existingElem.text = text;
+          this.renderDrawingElements();
+          this.debounceSaveDrawing();
+        } else {
+          const labelElem = {
+            id: 'text-' + Date.now(),
+            type: 'text',
+            x,
+            y,
+            text,
+            color: this.currentColor,
+          };
+          this.pushDrawingElement(labelElem);
+        }
+      }
+    };
+
+    editor.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        commit();
+      } else if (e.key === 'Escape') {
+        committed = true;
+        editor.remove();
+      }
+    });
+
+    editor.addEventListener('blur', () => {
+      commit();
+    });
+
+    this.viewport.appendChild(editor);
+    setTimeout(() => editor.focus(), 20);
   }
 
   // Selection & History

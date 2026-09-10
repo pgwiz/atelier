@@ -18,8 +18,8 @@ use crate::{
     main_types::{AppError, AppState},
     models::{
         Board, BoardItem, Character, CopyProjectDto, CreateProjectDto, Link, MergeProjectDto,
-        Project, ProjectAttachment, ProjectManifest, ProjectPart, Prompt, TransferProjectDto,
-        UpdateProjectDto,
+        Project, ProjectActivityItem, ProjectAttachment, ProjectManifest, ProjectPart, Prompt,
+        TransferProjectDto, UpdateProjectDto,
     },
 };
 
@@ -2295,4 +2295,300 @@ pub async fn import_project_package(
     let _ = sync_project_json(&conn, new_id, &state.data_dir);
     let imported = fetch_project_summary(&conn, new_id)?;
     Ok((StatusCode::CREATED, Json(imported)))
+}
+
+pub async fn get_project_activity(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<Json<Vec<ProjectActivityItem>>, AppError> {
+    let conn = state.pool.get()?;
+
+    // Verify project exists
+    let proj_exists: bool = conn
+        .query_row(
+            "SELECT 1 FROM projects WHERE id = ?1",
+            [id],
+            |_| Ok(true),
+        )
+        .unwrap_or(false);
+
+    if !proj_exists {
+        return Err(AppError::NotFound(format!("Project {} not found", id)));
+    }
+
+    let mut activities = Vec::new();
+
+    // 1. Project itself
+    {
+        let mut stmt = conn.prepare(
+            "SELECT name, status, created_at, updated_at FROM projects WHERE id = ?1",
+        )?;
+        let mut rows = stmt.query([id])?;
+        if let Some(r) = rows.next()? {
+            let name: String = r.get(0)?;
+            let status: String = r.get(1)?;
+            let created_at: String = r.get(2)?;
+            let updated_at: String = r.get(3)?;
+
+            activities.push(ProjectActivityItem {
+                id: format!("project-{}-created", id),
+                entity_type: "project".to_string(),
+                entity_id: id,
+                title: name.clone(),
+                action: "Created".to_string(),
+                timestamp: created_at.clone(),
+                details: Some("Project workspace initialized".to_string()),
+            });
+
+            if updated_at != created_at {
+                activities.push(ProjectActivityItem {
+                    id: format!("project-{}-updated", id),
+                    entity_type: "project".to_string(),
+                    entity_id: id,
+                    title: name,
+                    action: "Updated".to_string(),
+                    timestamp: updated_at,
+                    details: Some(format!("Status: {}", status)),
+                });
+            }
+        }
+    }
+
+    // 2. Production parts
+    {
+        let mut stmt = conn.prepare(
+            "SELECT id, title, part_type, status, created_at, updated_at, completed_at
+             FROM project_parts WHERE project_id = ?1",
+        )?;
+        let mut rows = stmt.query([id])?;
+        while let Some(r) = rows.next()? {
+            let part_id: i64 = r.get(0)?;
+            let title: String = r.get(1)?;
+            let part_type: String = r.get(2)?;
+            let status: String = r.get(3)?;
+            let created_at: String = r.get(4)?;
+            let updated_at: String = r.get(5)?;
+            let completed_at: Option<String> = r.get(6)?;
+
+            activities.push(ProjectActivityItem {
+                id: format!("part-{}-created", part_id),
+                entity_type: "part".to_string(),
+                entity_id: part_id,
+                title: title.clone(),
+                action: "Created".to_string(),
+                timestamp: created_at.clone(),
+                details: Some(format!("Part Type: {}", part_type)),
+            });
+
+            if let Some(comp) = completed_at {
+                activities.push(ProjectActivityItem {
+                    id: format!("part-{}-completed", part_id),
+                    entity_type: "part".to_string(),
+                    entity_id: part_id,
+                    title: title.clone(),
+                    action: "Completed".to_string(),
+                    timestamp: comp,
+                    details: Some(format!("Scene completed ({})", part_type)),
+                });
+            } else if updated_at != created_at {
+                activities.push(ProjectActivityItem {
+                    id: format!("part-{}-updated", part_id),
+                    entity_type: "part".to_string(),
+                    entity_id: part_id,
+                    title: title.clone(),
+                    action: "Updated".to_string(),
+                    timestamp: updated_at,
+                    details: Some(format!("Status: {}", status)),
+                });
+            }
+        }
+    }
+
+    // 3. Prompts
+    {
+        let mut stmt = conn.prepare(
+            "SELECT id, title, category, created_at, updated_at FROM prompts WHERE project_id = ?1",
+        )?;
+        let mut rows = stmt.query([id])?;
+        while let Some(r) = rows.next()? {
+            let p_id: i64 = r.get(0)?;
+            let title: String = r.get(1)?;
+            let category: Option<String> = r.get(2)?;
+            let created_at: String = r.get(3)?;
+            let updated_at: String = r.get(4)?;
+
+            activities.push(ProjectActivityItem {
+                id: format!("prompt-{}-created", p_id),
+                entity_type: "prompt".to_string(),
+                entity_id: p_id,
+                title: title.clone(),
+                action: "Created".to_string(),
+                timestamp: created_at.clone(),
+                details: category.as_ref().map(|c| format!("Category: {}", c)),
+            });
+
+            if updated_at != created_at {
+                activities.push(ProjectActivityItem {
+                    id: format!("prompt-{}-updated", p_id),
+                    entity_type: "prompt".to_string(),
+                    entity_id: p_id,
+                    title,
+                    action: "Updated".to_string(),
+                    timestamp: updated_at,
+                    details: category.map(|c| format!("Category: {}", c)),
+                });
+            }
+        }
+    }
+
+    // 4. Characters
+    {
+        let mut stmt = conn.prepare(
+            "SELECT id, name, created_at, updated_at FROM characters WHERE project_id = ?1",
+        )?;
+        let mut rows = stmt.query([id])?;
+        while let Some(r) = rows.next()? {
+            let c_id: i64 = r.get(0)?;
+            let name: String = r.get(1)?;
+            let created_at: String = r.get(2)?;
+            let updated_at: String = r.get(3)?;
+
+            activities.push(ProjectActivityItem {
+                id: format!("character-{}-created", c_id),
+                entity_type: "character".to_string(),
+                entity_id: c_id,
+                title: name.clone(),
+                action: "Created".to_string(),
+                timestamp: created_at.clone(),
+                details: Some("Character persona added".to_string()),
+            });
+
+            if updated_at != created_at {
+                activities.push(ProjectActivityItem {
+                    id: format!("character-{}-updated", c_id),
+                    entity_type: "character".to_string(),
+                    entity_id: c_id,
+                    title: name,
+                    action: "Updated".to_string(),
+                    timestamp: updated_at,
+                    details: Some("Persona details revised".to_string()),
+                });
+            }
+        }
+    }
+
+    // 5. References / Links
+    {
+        let mut stmt = conn.prepare(
+            "SELECT id, title, platform, created_at, updated_at FROM links WHERE project_id = ?1",
+        )?;
+        let mut rows = stmt.query([id])?;
+        while let Some(r) = rows.next()? {
+            let l_id: i64 = r.get(0)?;
+            let title: String = r.get(1)?;
+            let platform: Option<String> = r.get(2)?;
+            let created_at: String = r.get(3)?;
+            let updated_at: String = r.get(4)?;
+
+            activities.push(ProjectActivityItem {
+                id: format!("link-{}-created", l_id),
+                entity_type: "link".to_string(),
+                entity_id: l_id,
+                title: title.clone(),
+                action: "Created".to_string(),
+                timestamp: created_at.clone(),
+                details: platform.as_ref().map(|p| format!("Platform: {}", p)),
+            });
+
+            if updated_at != created_at {
+                activities.push(ProjectActivityItem {
+                    id: format!("link-{}-updated", l_id),
+                    entity_type: "link".to_string(),
+                    entity_id: l_id,
+                    title,
+                    action: "Updated".to_string(),
+                    timestamp: updated_at,
+                    details: platform.map(|p| format!("Platform: {}", p)),
+                });
+            }
+        }
+    }
+
+    // 6. Boards
+    {
+        let mut stmt = conn.prepare(
+            "SELECT id, name, created_at, updated_at FROM boards WHERE project_id = ?1",
+        )?;
+        let mut rows = stmt.query([id])?;
+        while let Some(r) = rows.next()? {
+            let b_id: i64 = r.get(0)?;
+            let name: String = r.get(1)?;
+            let created_at: String = r.get(2)?;
+            let updated_at: String = r.get(3)?;
+
+            activities.push(ProjectActivityItem {
+                id: format!("board-{}-created", b_id),
+                entity_type: "board".to_string(),
+                entity_id: b_id,
+                title: name.clone(),
+                action: "Created".to_string(),
+                timestamp: created_at.clone(),
+                details: Some("Visual planning board created".to_string()),
+            });
+
+            if updated_at != created_at {
+                activities.push(ProjectActivityItem {
+                    id: format!("board-{}-updated", b_id),
+                    entity_type: "board".to_string(),
+                    entity_id: b_id,
+                    title: name,
+                    action: "Updated".to_string(),
+                    timestamp: updated_at,
+                    details: Some("Board canvas edited".to_string()),
+                });
+            }
+        }
+    }
+
+    // 7. Attachments
+    {
+        let mut stmt = conn.prepare(
+            "SELECT id, name, addon_type, created_at, updated_at FROM project_attachments WHERE project_id = ?1",
+        )?;
+        let mut rows = stmt.query([id])?;
+        while let Some(r) = rows.next()? {
+            let a_id: i64 = r.get(0)?;
+            let name: String = r.get(1)?;
+            let addon_type: String = r.get(2)?;
+            let created_at: String = r.get(3)?;
+            let updated_at: String = r.get(4)?;
+
+            activities.push(ProjectActivityItem {
+                id: format!("attachment-{}-created", a_id),
+                entity_type: "attachment".to_string(),
+                entity_id: a_id,
+                title: name.clone(),
+                action: "Created".to_string(),
+                timestamp: created_at.clone(),
+                details: Some(format!("Uploaded {}", addon_type)),
+            });
+
+            if updated_at != created_at {
+                activities.push(ProjectActivityItem {
+                    id: format!("attachment-{}-updated", a_id),
+                    entity_type: "attachment".to_string(),
+                    entity_id: a_id,
+                    title: name,
+                    action: "Updated".to_string(),
+                    timestamp: updated_at,
+                    details: Some(format!("Updated {}", addon_type)),
+                });
+            }
+        }
+    }
+
+    // Sort by timestamp descending (newest first)
+    activities.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+
+    Ok(Json(activities))
 }

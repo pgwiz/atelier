@@ -10,6 +10,9 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2338bdf8'><path d='M12 2C6.49 2 2 6.49 2 12c0 4.41 3.59 8 8 8h1.5c1.1 0 2-.9 2-2 0-.41-.13-.79-.35-1.11-.2-.29-.32-.65-.32-1.04 0-1.1.9-2 2-2H17c3.86 0 7-3.14 7-7 0-4.41-4.49-6.85-12-6.85zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 8 6.5 8s1.5.67 1.5 1.5S7.33 11 6.5 11zm3-4C8.67 7 8 6.33 8 5.5S8.67 4 9.5 4s1.5.67 1.5 1.5S10.33 7 9.5 7zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 4 14.5 4s1.5.67 1.5 1.5S15.33 7 14.5 7zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 8 17.5 8s1.5.67 1.5 1.5S18.33 11 17.5 11z'/></svg>">
 </head>
 <body>
+  <!-- Ambient Solid Background Fade Overlay -->
+  <div id="ambient-fade-overlay" class="ambient-fade-overlay"></div>
+
   <div class="app-layout">
     <!-- Collapsible Sidebar -->
     <aside class="sidebar" id="sidebar">
@@ -71,6 +74,10 @@
           <span class="nav-label">Projects OS</span>
           <span class="nav-badge" id="badge-projects">1</span>
         </button>
+        <button class="nav-item" data-view="project-hub" id="nav-item-hub">
+          <span class="nav-icon"><i class="fa-solid fa-gauge-high"></i></span>
+          <span class="nav-label">Project Hub</span>
+        </button>
         <button class="nav-item" data-view="parts">
           <span class="nav-icon"><i class="fa-solid fa-film"></i></span>
           <span class="nav-label">Production Parts</span>
@@ -100,6 +107,10 @@
           <span class="nav-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
           <span class="nav-label">Search & Tags</span>
         </button>
+        <button class="nav-item" data-view="settings" id="nav-item-settings">
+          <span class="nav-icon"><i class="fa-solid fa-gear"></i></span>
+          <span class="nav-label">Settings</span>
+        </button>
         <button class="nav-item" data-view="backup">
           <span class="nav-icon"><i class="fa-solid fa-floppy-disk"></i></span>
           <span class="nav-label">Backup & Port</span>
@@ -107,6 +118,10 @@
       </nav>
 
       <div class="sidebar-footer">
+        <button class="sidebar-ai-btn" id="btn-sidebar-ai" type="button" title="Open AI Assistant">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+          <span>AI Assistant</span>
+        </button>
         <div class="theme-control">
           <button class="theme-toggle-btn" id="theme-toggle-btn" type="button" title="Switch UI Theme">
             <span class="theme-btn-icon"><i class="fa-solid fa-palette"></i></span>
@@ -158,6 +173,151 @@
 
         <div class="cards-grid" id="projects-grid">
           <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- ================= DEDICATED PROJECT HUB VIEW ================= -->
+      <section class="view-section" id="view-project-hub" style="display: none;">
+        <!-- Top Management Banner -->
+        <div class="project-hub-banner">
+          <div class="hub-banner-main">
+            <div class="hub-project-identity">
+              <div class="hub-project-color-dot" id="hub-project-dot"></div>
+              <div class="hub-project-titles">
+                <div class="hub-title-row">
+                  <h2 id="hub-project-name">Default Studio</h2>
+                  <button type="button" class="badge badge-status hub-status-pill" id="hub-project-status" title="Click to cycle status">In Progress</button>
+                </div>
+                <p class="hub-project-desc" id="hub-project-desc">Workspace overview and directives hub</p>
+                <div class="hub-path-row">
+                  <span class="hub-path-label"><i class="fa-solid fa-folder"></i> Folder:</span>
+                  <code class="hub-path-code" id="hub-project-path">data/projects/1/</code>
+                  <button type="button" class="btn-icon-xs" id="btn-hub-copy-path" title="Copy Folder Path"><i class="fa-solid fa-copy"></i></button>
+                  <button type="button" class="btn-icon-xs" id="btn-hub-reveal-folder" title="Reveal in OS File Explorer"><i class="fa-solid fa-folder-open"></i></button>
+                </div>
+              </div>
+            </div>
+
+            <div class="hub-banner-actions">
+              <button class="btn btn-secondary btn-sm" id="btn-hub-open-folder"><i class="fa-solid fa-folder-open"></i> Open Folder</button>
+              <button class="btn btn-outline btn-sm" id="btn-hub-reload-json"><i class="fa-solid fa-rotate"></i> Reload JSON</button>
+              <button class="btn btn-outline btn-sm" id="btn-hub-edit-project"><i class="fa-solid fa-pen-to-square"></i> Edit</button>
+              <button class="btn btn-outline btn-sm" id="btn-hub-export-zip"><i class="fa-solid fa-file-zipper"></i> Export ZIP</button>
+              <button class="btn btn-primary btn-sm" id="btn-hub-open-ai"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Assistant</button>
+            </div>
+          </div>
+
+          <!-- Progress summary -->
+          <div class="hub-progress-bar-wrap">
+            <div class="hub-progress-meta">
+              <span>Production Pipeline Progress</span>
+              <span id="hub-progress-text">0% Complete (0/0 Scenes Done)</span>
+            </div>
+            <div class="progress-track">
+              <div class="progress-fill" id="hub-progress-fill" style="width: 0%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Category Directives Hub: 5 Interactive Cards -->
+        <div class="section-heading-row">
+          <h3><i class="fa-solid fa-cubes"></i> Category Directives Hub</h3>
+          <span class="section-subtext">Click any directive card to jump directly into management</span>
+        </div>
+
+        <div class="hub-directives-grid">
+          <div class="hub-directive-card" data-goto="parts">
+            <div class="directive-card-top">
+              <div class="directive-icon parts-icon"><i class="fa-solid fa-film"></i></div>
+              <span class="directive-count" id="hub-count-parts">0</span>
+            </div>
+            <div class="directive-card-body">
+              <h4>Production Parts</h4>
+              <p>Scenes, chapters, segments, timeline ordering, and audio/script attachments</p>
+            </div>
+            <div class="directive-card-footer">
+              <span>View Scenes <i class="fa-solid fa-arrow-right"></i></span>
+            </div>
+          </div>
+
+          <div class="hub-directive-card" data-goto="prompts">
+            <div class="directive-card-top">
+              <div class="directive-icon prompts-icon"><i class="fa-solid fa-feather-pointed"></i></div>
+              <span class="directive-count" id="hub-count-prompts">0</span>
+            </div>
+            <div class="directive-card-body">
+              <h4>Generation Prompts</h4>
+              <p>Image, video, and script prompts with system prompts and JSON parameters</p>
+            </div>
+            <div class="directive-card-footer">
+              <span>View Prompts <i class="fa-solid fa-arrow-right"></i></span>
+            </div>
+          </div>
+
+          <div class="hub-directive-card" data-goto="characters">
+            <div class="directive-card-top">
+              <div class="directive-icon characters-icon"><i class="fa-solid fa-users"></i></div>
+              <span class="directive-count" id="hub-count-characters">0</span>
+            </div>
+            <div class="directive-card-body">
+              <h4>Cast & Characters</h4>
+              <p>Character personas, visual traits, concept avatars, and continuity lore</p>
+            </div>
+            <div class="directive-card-footer">
+              <span>View Characters <i class="fa-solid fa-arrow-right"></i></span>
+            </div>
+          </div>
+
+          <div class="hub-directive-card" data-goto="links">
+            <div class="directive-card-top">
+              <div class="directive-icon links-icon"><i class="fa-solid fa-link"></i></div>
+              <span class="directive-count" id="hub-count-links">0</span>
+            </div>
+            <div class="directive-card-body">
+              <h4>References & Media</h4>
+              <p>Moodboards, YouTube oEmbed references, bookmarks, and project files</p>
+            </div>
+            <div class="directive-card-footer">
+              <span>View References <i class="fa-solid fa-arrow-right"></i></span>
+            </div>
+          </div>
+
+          <div class="hub-directive-card" data-goto="boards">
+            <div class="directive-card-top">
+              <div class="directive-icon boards-icon"><i class="fa-solid fa-chalkboard"></i></div>
+              <span class="directive-count" id="hub-count-boards">0</span>
+            </div>
+            <div class="directive-card-body">
+              <h4>Planning Boards</h4>
+              <p>Freeform vector diagramming, smart connectors, stickies, and mini scene parts</p>
+            </div>
+            <div class="directive-card-footer">
+              <span>View Boards <i class="fa-solid fa-arrow-right"></i></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- "What Changed" Activity Feed -->
+        <div class="hub-activity-section">
+          <div class="section-heading-row">
+            <div class="heading-with-icon">
+              <i class="fa-solid fa-clock-rotate-left"></i>
+              <h3>What Changed (Recent Activity Feed)</h3>
+            </div>
+            <div class="activity-sort-wrap">
+              <label for="hub-activity-sort"><i class="fa-solid fa-arrow-down-short-wide"></i> Sort:</label>
+              <select id="hub-activity-sort" class="form-select form-select-sm">
+                <option value="recent">Most Recent First</option>
+                <option value="type">By Entity Type</option>
+                <option value="title">By Title (A-Z)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="hub-activity-timeline" id="hub-activity-list">
+            <!-- Populated dynamically via /api/projects/:id/activity -->
+            <div class="activity-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading recent activity...</div>
+          </div>
         </div>
       </section>
 
@@ -574,79 +734,431 @@
         </div>
       </section>
 
+      <!-- ================= ADVANCED SETTINGS VIEW ================= -->
+      <section class="view-section" id="view-settings" style="display: none;">
+        <header class="view-header">
+          <div class="header-left">
+            <h2>Studio Settings & Configuration</h2>
+            <p class="section-desc">AI provider keys, futuristic interface layout, ambient background animation, and data storage</p>
+          </div>
+        </header>
+
+        <div class="settings-grid">
+          <!-- Card 1: AI Assistant & API Keys -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <div class="settings-card-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+              <div>
+                <h3>AI Assistant & API Keys</h3>
+                <p class="settings-card-subtitle">Connect OpenRouter, OpenAI, Anthropic, Gemini, Groq, or local Ollama</p>
+              </div>
+            </div>
+
+            <form id="form-ai-settings" class="settings-card-body">
+              <div class="form-group">
+                <label for="setting-ai-provider">AI Provider</label>
+                <select id="setting-ai-provider" class="form-select">
+                  <option value="openrouter">OpenRouter (Multi-model aggregation)</option>
+                  <option value="openai">OpenAI (GPT-4o, GPT-4o-mini)</option>
+                  <option value="anthropic">Anthropic (Claude 3.5 Sonnet / Haiku)</option>
+                  <option value="gemini">Google Gemini (Gemini 1.5 Flash / Pro)</option>
+                  <option value="groq">Groq (Ultra-fast Llama 3)</option>
+                  <option value="ollama">Ollama (Local offline model server)</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="setting-ai-key">API Key / Token</label>
+                <div class="input-with-button">
+                  <input type="password" id="setting-ai-key" class="form-input code-font" placeholder="sk-or-v1-... or your provider key">
+                  <button type="button" class="btn btn-outline btn-sm" id="btn-toggle-ai-key" title="Toggle visibility">
+                    <i class="fa-solid fa-eye" id="icon-toggle-ai-key"></i>
+                  </button>
+                </div>
+                <span class="form-hint">Stored securely in local SQLite database and client storage. Never shared externally.</span>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group flex-1">
+                  <label for="setting-ai-model">Model ID</label>
+                  <input type="text" id="setting-ai-model" class="form-input code-font" placeholder="e.g. anthropic/claude-3.5-sonnet">
+                </div>
+                <div class="form-group flex-1">
+                  <label for="setting-ai-base-url">Base URL (Optional)</label>
+                  <input type="text" id="setting-ai-base-url" class="form-input code-font" placeholder="http://localhost:11434">
+                </div>
+              </div>
+
+              <div class="settings-actions-row">
+                <button type="submit" class="btn btn-primary btn-sm" id="btn-save-ai-settings"><i class="fa-solid fa-floppy-disk"></i> Save AI Settings</button>
+                <button type="button" class="btn btn-outline btn-sm" id="btn-test-ai-connection"><i class="fa-solid fa-plug"></i> Test Connection</button>
+                <div id="ai-test-status" class="connection-status-pill" style="display: none;"></div>
+              </div>
+            </form>
+          </div>
+
+          <!-- Card 2: Futuristic Layout & Chamfered Edges -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <div class="settings-card-icon"><i class="fa-solid fa-cubes-stacked"></i></div>
+              <div>
+                <h3>Workspace Interface & Dock</h3>
+                <p class="settings-card-subtitle">Choose between classic left sidebar and futuristic bottom floating dock</p>
+              </div>
+            </div>
+
+            <div class="settings-card-body">
+              <div class="form-group">
+                <label>Primary Navigation Layout</label>
+                <div class="layout-toggle-group">
+                  <button type="button" class="layout-mode-btn active" data-layout="sidebar" id="btn-layout-sidebar">
+                    <i class="fa-solid fa-table-columns"></i>
+                    <span>Classic Sidebar</span>
+                  </button>
+                  <button type="button" class="layout-mode-btn" data-layout="dock" id="btn-layout-dock">
+                    <i class="fa-solid fa-window-minimize"></i>
+                    <span>Bottom Floating Dock</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="form-group checkbox-group-compound">
+                <label class="toggle-checkbox-label">
+                  <input type="checkbox" id="setting-chamfered-edges">
+                  <span class="toggle-custom"></span>
+                  <span class="toggle-label-text">
+                    <strong>Cyberpunk Futuristic Chamfered Edges</strong>
+                    <span class="form-hint">Applies 4px-6px geometric chamfer corner cuts across cards, panels, and toolbars (Zero gradients, max 8px bounds)</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 3: Ambient Background Animation -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <div class="settings-card-icon"><i class="fa-solid fa-circle-half-stroke"></i></div>
+              <div>
+                <h3>Ambient Background Animation</h3>
+                <p class="settings-card-subtitle">Configurable solid-color breathing fade animation (100% zero gradients)</p>
+              </div>
+            </div>
+
+            <div class="settings-card-body">
+              <div class="form-group checkbox-group-compound">
+                <label class="toggle-checkbox-label">
+                  <input type="checkbox" id="setting-ambient-active">
+                  <span class="toggle-custom"></span>
+                  <span class="toggle-label-text">
+                    <strong>Enable Ambient Background Animation</strong>
+                    <span class="form-hint">Subtle solid-color pulse wash behind the interface with zero gradients</span>
+                  </span>
+                </label>
+              </div>
+
+              <div class="form-group">
+                <label>Color Presets</label>
+                <div class="ambient-color-presets">
+                  <button type="button" class="ambient-preset-btn active" data-color="#dc2626" style="background-color: #dc2626;" title="Crimson Red (Default)">
+                    <span class="preset-name">Crimson Red</span>
+                  </button>
+                  <button type="button" class="ambient-preset-btn" data-color="#d97706" style="background-color: #d97706;" title="Amber Gold">
+                    <span class="preset-name">Amber</span>
+                  </button>
+                  <button type="button" class="ambient-preset-btn" data-color="#0284c7" style="background-color: #0284c7;" title="Cyan Blue">
+                    <span class="preset-name">Cyan</span>
+                  </button>
+                  <button type="button" class="ambient-preset-btn" data-color="#9333ea" style="background-color: #9333ea;" title="Neon Purple">
+                    <span class="preset-name">Purple</span>
+                  </button>
+                  <button type="button" class="ambient-preset-btn" data-color="#059669" style="background-color: #059669;" title="Emerald Green">
+                    <span class="preset-name">Emerald</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group flex-1">
+                  <label for="setting-ambient-custom-hex">Custom Hex Color</label>
+                  <input type="text" id="setting-ambient-custom-hex" class="form-input code-font" placeholder="#dc2626" value="#dc2626">
+                </div>
+                <div class="form-group flex-1">
+                  <label for="setting-ambient-speed">Cycle Speed</label>
+                  <select id="setting-ambient-speed" class="form-select">
+                    <option value="4s">4s (Dynamic Fast)</option>
+                    <option value="8s" selected>8s (Smooth Normal)</option>
+                    <option value="12s">12s (Gentle Slow)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="setting-ambient-intensity">Color Wash Intensity (<span id="ambient-intensity-val">15%</span>)</label>
+                <input type="range" id="setting-ambient-intensity" min="0.05" max="0.30" step="0.01" value="0.15" class="form-range">
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 4: Global UI Themes -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <div class="settings-card-icon"><i class="fa-solid fa-palette"></i></div>
+              <div>
+                <h3>Global UI Theme</h3>
+                <p class="settings-card-subtitle">Crisp high-contrast palettes across the entire studio</p>
+              </div>
+            </div>
+
+            <div class="settings-card-body">
+              <div class="theme-selector-grid" id="settings-themes-grid">
+                <button type="button" class="theme-card-option" data-theme="dark">
+                  <span class="theme-swatch dark-swatch"></span>
+                  <strong>Dark Slate</strong>
+                  <span class="theme-card-desc">Default midnight studio</span>
+                </button>
+                <button type="button" class="theme-card-option" data-theme="light">
+                  <span class="theme-swatch light-swatch"></span>
+                  <strong>Crisp Light</strong>
+                  <span class="theme-card-desc">Clean paper aesthetic</span>
+                </button>
+                <button type="button" class="theme-card-option" data-theme="sepia">
+                  <span class="theme-swatch sepia-swatch"></span>
+                  <strong>Warm Sepia</strong>
+                  <span class="theme-card-desc">Vintage notebook & parchment</span>
+                </button>
+                <button type="button" class="theme-card-option" data-theme="pastel">
+                  <span class="theme-swatch pastel-swatch"></span>
+                  <strong>Pastel Dream</strong>
+                  <span class="theme-card-desc">Soft creative tones</span>
+                </button>
+                <button type="button" class="theme-card-option" data-theme="cyberpunk">
+                  <span class="theme-swatch cyberpunk-swatch"></span>
+                  <strong>Cyberpunk Neon</strong>
+                  <span class="theme-card-desc">High-contrast retro tech</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
     </main>
   </div>
+
+  <!-- ================= FUTURISTIC BOTTOM FLOATING DOCK ================= -->
+  <div class="bottom-dock" id="bottom-dock">
+    <div class="dock-items">
+      <button type="button" class="dock-btn active" data-view="projects" title="Projects OS">
+        <i class="fa-solid fa-folder-tree"></i>
+        <span class="dock-tooltip">Projects</span>
+      </button>
+      <button type="button" class="dock-btn" data-view="project-hub" title="Project Hub">
+        <i class="fa-solid fa-gauge-high"></i>
+        <span class="dock-tooltip">Hub</span>
+      </button>
+      <button type="button" class="dock-btn" data-view="parts" title="Production Parts">
+        <i class="fa-solid fa-film"></i>
+        <span class="dock-tooltip">Parts</span>
+      </button>
+      <button type="button" class="dock-btn" data-view="prompts" title="Prompts">
+        <i class="fa-solid fa-feather-pointed"></i>
+        <span class="dock-tooltip">Prompts</span>
+      </button>
+      <button type="button" class="dock-btn" data-view="characters" title="Characters">
+        <i class="fa-solid fa-users"></i>
+        <span class="dock-tooltip">Cast</span>
+      </button>
+      <button type="button" class="dock-btn" data-view="links" title="References">
+        <i class="fa-solid fa-link"></i>
+        <span class="dock-tooltip">Refs</span>
+      </button>
+      <button type="button" class="dock-btn" data-view="boards" title="Boards">
+        <i class="fa-solid fa-chalkboard"></i>
+        <span class="dock-tooltip">Boards</span>
+      </button>
+      <button type="button" class="dock-btn" data-view="search" title="Search">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <span class="dock-tooltip">Search</span>
+      </button>
+      <button type="button" class="dock-btn dock-btn-ai" id="dock-btn-ai" title="AI Assistant">
+        <i class="fa-solid fa-wand-magic-sparkles"></i>
+        <span class="dock-tooltip">AI</span>
+      </button>
+      <button type="button" class="dock-btn" data-view="settings" title="Settings">
+        <i class="fa-solid fa-gear"></i>
+        <span class="dock-tooltip">Settings</span>
+      </button>
+    </div>
+    <button type="button" class="dock-expand-toggle" id="btn-dock-expand" title="Expand Project Details">
+      <i class="fa-solid fa-chevron-up" id="dock-expand-chevron"></i>
+    </button>
+  </div>
+
+  <!-- Dock Slide-Up Expand Drawer -->
+  <div class="dock-expand-drawer" id="dock-expand-drawer">
+    <div class="dock-drawer-content">
+      <div class="dock-drawer-header">
+        <div class="dock-drawer-project">
+          <i class="fa-solid fa-folder-open text-primary"></i>
+          <span class="dock-drawer-name" id="dock-drawer-project-name">Default Studio</span>
+          <span class="badge badge-sm" id="dock-drawer-project-status">In Progress</span>
+        </div>
+        <button type="button" class="btn-icon-close" id="btn-close-dock-drawer" title="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="dock-drawer-stats">
+        <span class="stat-chip-sm" id="dock-chip-parts"><i class="fa-solid fa-film"></i> 0 Parts</span>
+        <span class="stat-chip-sm" id="dock-chip-prompts"><i class="fa-solid fa-feather-pointed"></i> 0 Prompts</span>
+        <span class="stat-chip-sm" id="dock-chip-characters"><i class="fa-solid fa-users"></i> 0 Cast</span>
+        <span class="stat-chip-sm" id="dock-chip-links"><i class="fa-solid fa-link"></i> 0 Refs</span>
+        <span class="stat-chip-sm" id="dock-chip-boards"><i class="fa-solid fa-chalkboard"></i> 0 Boards</span>
+      </div>
+      <div class="dock-drawer-actions">
+        <button type="button" class="btn btn-xs btn-primary" id="dock-btn-open-hub"><i class="fa-solid fa-gauge-high"></i> Open Hub</button>
+        <button type="button" class="btn btn-xs btn-outline" id="dock-btn-quick-new-part"><i class="fa-solid fa-plus"></i> New Part</button>
+        <button type="button" class="btn btn-xs btn-outline" id="dock-btn-quick-new-prompt"><i class="fa-solid fa-plus"></i> New Prompt</button>
+        <button type="button" class="btn btn-xs btn-outline" id="dock-btn-quick-open-folder"><i class="fa-solid fa-folder-open"></i> Folder</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= SLIDE-OUT AI ASSISTANT DRAWER ================= -->
+  <aside class="ai-chat-drawer" id="ai-chat-drawer">
+    <div class="ai-drawer-header">
+      <div class="ai-drawer-title">
+        <i class="fa-solid fa-wand-magic-sparkles ai-sparkle-icon"></i>
+        <h3>Atelier AI Assistant</h3>
+        <span class="badge badge-xs badge-primary" id="ai-provider-badge">OpenRouter</span>
+      </div>
+      <div class="ai-drawer-controls">
+        <button type="button" class="btn-icon" id="btn-clear-ai-chat" title="Clear Conversation"><i class="fa-solid fa-trash-can"></i></button>
+        <button type="button" class="btn-icon" id="btn-close-ai-drawer" title="Close Drawer"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+    </div>
+
+    <div class="ai-drawer-context-bar">
+      <span class="ai-context-label"><i class="fa-solid fa-cube"></i> Active Project:</span>
+      <span class="ai-context-project" id="ai-context-project-name">Default Studio</span>
+    </div>
+
+    <div class="ai-drawer-messages" id="ai-chat-messages">
+      <div class="ai-message assistant intro">
+        <div class="ai-message-bubble">
+          <p><strong>Welcome to Atelier AI.</strong> I can help you brainstorm cinematic prompts, flesh out character personas, or draft scene breakdowns for your production parts.</p>
+          <div class="ai-quick-suggestions">
+            <button type="button" class="ai-suggestion-chip" data-prompt="Brainstorm 3 unique scene ideas for this project"><i class="fa-solid fa-film"></i> 3 Scene Ideas</button>
+            <button type="button" class="ai-suggestion-chip" data-prompt="Generate a compelling character persona with visual traits and lore"><i class="fa-solid fa-users"></i> Character Persona</button>
+            <button type="button" class="ai-suggestion-chip" data-prompt="Write a detailed cinematic Midjourney v6 lighting prompt"><i class="fa-solid fa-feather-pointed"></i> Cinematic Prompt</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <form class="ai-drawer-input-bar" id="ai-chat-form">
+      <textarea id="ai-chat-input" class="form-textarea" placeholder="Ask AI to brainstorm prompts, characters, or scenes... (Enter to send, Shift+Enter for newline)" rows="2" required></textarea>
+      <div class="ai-drawer-input-actions">
+        <button type="submit" class="btn btn-primary btn-sm" id="btn-send-ai-chat">
+          <i class="fa-solid fa-paper-plane"></i> Send
+        </button>
+      </div>
+    </form>
+  </aside>
 
   <!-- ================= MODALS ================= -->
 
   <!-- Prompt Modal -->
   <div class="modal-overlay" id="modal-prompt">
-    <div class="modal-box modal-lg">
+    <div class="modal-box modal-lg compound-modal-box">
       <div class="modal-header">
-        <h3 id="prompt-modal-title">New Prompt</h3>
+        <div class="modal-title-group">
+          <i class="fa-solid fa-feather-pointed modal-header-icon"></i>
+          <h3 id="prompt-modal-title">New Prompt</h3>
+        </div>
         <button class="btn-close" onclick="closeModal('modal-prompt')"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <form id="form-prompt" class="modal-body">
         <input type="hidden" id="prompt-id">
-        <div class="form-row">
-          <div class="form-group flex-2">
-            <label for="prompt-title">Title *</label>
-            <input type="text" id="prompt-title" class="form-input" required placeholder="e.g. Master Photorealistic Portrait">
-          </div>
-          <div class="form-group flex-1">
-            <label for="prompt-category">Category</label>
-            <input type="text" id="prompt-category" class="form-input" placeholder="e.g. Cinematic, Coding, Writing">
-          </div>
-        </div>
 
-        <div class="form-group">
-          <label for="prompt-body">Prompt Text *</label>
-          <textarea id="prompt-body" class="form-textarea" rows="4" required placeholder="Enter primary prompt text..."></textarea>
-        </div>
-
-        <div class="form-group">
-          <label for="prompt-system">System / Meta Prompt</label>
-          <textarea id="prompt-system" class="form-textarea" rows="2" placeholder="Optional system prompt or instructions..."></textarea>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group flex-1">
-            <label for="prompt-character">Linked Character</label>
-            <select id="prompt-character" class="form-select">
-              <option value="">None (Independent Prompt)</option>
-            </select>
+        <!-- Primary Prompt Panel -->
+        <div class="compound-panel">
+          <div class="compound-panel-title"><i class="fa-solid fa-pen-nib"></i> Primary Directive</div>
+          <div class="form-row form-row-dense">
+            <div class="form-group flex-2">
+              <label for="prompt-title">Title *</label>
+              <input type="text" id="prompt-title" class="form-input form-input-dense" required placeholder="e.g. Master Photorealistic Portrait">
+            </div>
+            <div class="form-group flex-1">
+              <label for="prompt-category">Category</label>
+              <input type="text" id="prompt-category" class="form-input form-input-dense" placeholder="e.g. Cinematic, Coding, Writing">
+            </div>
           </div>
-          <div class="form-group flex-1">
-            <label for="prompt-model">Model Used</label>
-            <input type="text" id="prompt-model" class="form-input" placeholder="e.g. Midjourney v6, Claude 3.5 Sonnet, SDXL">
+          <div class="form-group mt-2">
+            <label for="prompt-body">Prompt Text *</label>
+            <textarea id="prompt-body" class="form-textarea form-textarea-dense" rows="3" required placeholder="Enter primary prompt text..."></textarea>
           </div>
         </div>
 
-        <div class="form-group">
-          <label for="prompt-parameters">Model Parameters (JSON)</label>
-          <textarea id="prompt-parameters" class="form-textarea code-font" rows="2" placeholder='{"temperature": 0.7, "aspect_ratio": "16:9", "cfg": 7.0}'></textarea>
+        <!-- Collapsible Toggle -->
+        <div class="compound-toggle-row">
+          <button type="button" class="btn btn-sm btn-outline compound-toggle-btn" id="btn-toggle-prompt-advanced">
+            <i class="fa-solid fa-sliders"></i> Advanced Parameters & System Prompt
+            <i class="fa-solid fa-chevron-down toggle-caret" id="prompt-advanced-caret"></i>
+          </button>
         </div>
 
-        <div class="form-group">
-          <label for="prompt-notes">Notes / Results</label>
-          <textarea id="prompt-notes" class="form-textarea" rows="2" placeholder="Learnings, best seeds, edge cases..."></textarea>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group flex-2">
-            <label for="prompt-tags">Tags (comma separated)</label>
-            <input type="text" id="prompt-tags" class="form-input" placeholder="cinematic, lighting, 8k, vfx">
+        <!-- Collapsible Advanced Options -->
+        <div id="prompt-advanced-options" class="compound-collapsible" style="display: none;">
+          <div class="compound-panel">
+            <div class="compound-panel-title"><i class="fa-solid fa-robot"></i> Model & Cast Association</div>
+            <div class="form-grid-2col">
+              <div class="form-group">
+                <label for="prompt-character">Linked Character</label>
+                <select id="prompt-character" class="form-select form-select-dense">
+                  <option value="">None (Independent Prompt)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="prompt-model">Model Used</label>
+                <input type="text" id="prompt-model" class="form-input form-input-dense" placeholder="e.g. Midjourney v6, Claude 3.5">
+              </div>
+            </div>
           </div>
-          <div class="form-group flex-1 checkbox-group-inline">
-            <label>
-              <input type="checkbox" id="prompt-favorite"> <i class="fa-solid fa-star"></i> Star Favorite
-            </label>
+
+          <div class="compound-panel">
+            <div class="compound-panel-title"><i class="fa-solid fa-code"></i> System Prompt & Model Parameters (JSON)</div>
+            <div class="form-group">
+              <label for="prompt-system">System / Meta Prompt</label>
+              <textarea id="prompt-system" class="form-textarea form-textarea-dense" rows="2" placeholder="Optional system prompt or instructions..."></textarea>
+            </div>
+            <div class="form-group mt-2">
+              <label for="prompt-parameters">Model Parameters (JSON)</label>
+              <textarea id="prompt-parameters" class="form-textarea form-textarea-dense code-font" rows="2" placeholder='{"temperature": 0.7, "aspect_ratio": "16:9", "cfg": 7.0}'></textarea>
+            </div>
+            <div class="form-group mt-2">
+              <label for="prompt-notes">Notes / Results</label>
+              <textarea id="prompt-notes" class="form-textarea form-textarea-dense" rows="2" placeholder="Learnings, best seeds, edge cases..."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Meta / Tags Panel -->
+        <div class="compound-panel mt-2">
+          <div class="form-row form-row-dense align-center">
+            <div class="form-group flex-2">
+              <label for="prompt-tags">Tags (comma separated)</label>
+              <input type="text" id="prompt-tags" class="form-input form-input-dense" placeholder="cinematic, lighting, 8k, vfx">
+            </div>
+            <div class="form-group flex-1 checkbox-group-inline pt-label">
+              <label>
+                <input type="checkbox" id="prompt-favorite"> <i class="fa-solid fa-star"></i> Star Favorite
+              </label>
+            </div>
           </div>
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-prompt')">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Prompt</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modal-prompt')">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-floppy-disk"></i> Save Prompt</button>
         </div>
       </form>
     </div>
@@ -654,52 +1166,74 @@
 
   <!-- Character Modal -->
   <div class="modal-overlay" id="modal-character">
-    <div class="modal-box">
+    <div class="modal-box compound-modal-box">
       <div class="modal-header">
-        <h3 id="character-modal-title">New Character</h3>
+        <div class="modal-title-group">
+          <i class="fa-solid fa-users modal-header-icon"></i>
+          <h3 id="character-modal-title">New Character</h3>
+        </div>
         <button class="btn-close" onclick="closeModal('modal-character')"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <form id="form-character" class="modal-body">
         <input type="hidden" id="character-id">
-        <div class="form-group">
-          <label for="character-name">Character Name *</label>
-          <input type="text" id="character-name" class="form-input" required placeholder="e.g. Elena Vance, Cyber Monk">
-        </div>
 
-        <div class="form-group">
-          <label for="character-description">Profile / Background</label>
-          <textarea id="character-description" class="form-textarea" rows="3" placeholder="Core persona summary, age, personality, archetype..."></textarea>
-        </div>
-
-        <div class="form-group">
-          <label for="character-traits">Visual Traits & Consistency Keywords</label>
-          <input type="text" id="character-traits" class="form-input" placeholder="e.g. silver undercut, amber cybernetic eye, distressed leather trenchcoat">
-        </div>
-
-        <div class="form-group">
-          <label>Avatar / Concept Art</label>
-          <div class="image-upload-zone" id="character-avatar-zone">
-            <input type="file" id="character-file-input" accept="image/*" style="display: none;">
-            <input type="hidden" id="character-image-path">
-            <div id="avatar-preview-container" class="avatar-preview-wrap">
-              <span class="upload-prompt-text"><i class="fa-solid fa-cloud-arrow-up"></i> Click or drop image to upload</span>
+        <!-- Core Persona Panel -->
+        <div class="compound-panel">
+          <div class="compound-panel-title"><i class="fa-solid fa-user"></i> Core Identity</div>
+          <div class="form-group">
+            <label for="character-name">Character Name *</label>
+            <input type="text" id="character-name" class="form-input form-input-dense" required placeholder="e.g. Elena Vance, Cyber Monk">
+          </div>
+          <div class="form-group mt-2">
+            <label for="character-description">Profile / Background</label>
+            <textarea id="character-description" class="form-textarea form-textarea-dense" rows="2" placeholder="Core persona summary, age, personality, archetype..."></textarea>
+          </div>
+          <div class="form-group mt-2">
+            <label>Avatar / Concept Art</label>
+            <div class="image-upload-zone" id="character-avatar-zone">
+              <input type="file" id="character-file-input" accept="image/*" style="display: none;">
+              <input type="hidden" id="character-image-path">
+              <div id="avatar-preview-container" class="avatar-preview-wrap">
+                <span class="upload-prompt-text"><i class="fa-solid fa-cloud-arrow-up"></i> Click or drop image</span>
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="form-group">
-          <label for="character-notes">Lore & Continuity Notes</label>
-          <textarea id="character-notes" class="form-textarea" rows="2" placeholder="Canon facts, relationship links, voice guidance..."></textarea>
+        <!-- Collapsible Toggle -->
+        <div class="compound-toggle-row">
+          <button type="button" class="btn btn-sm btn-outline compound-toggle-btn" id="btn-toggle-character-advanced">
+            <i class="fa-solid fa-sliders"></i> Advanced Persona & Visual Traits
+            <i class="fa-solid fa-chevron-down toggle-caret" id="character-advanced-caret"></i>
+          </button>
         </div>
 
-        <div class="form-group">
-          <label for="character-tags">Tags (comma separated)</label>
-          <input type="text" id="character-tags" class="form-input" placeholder="protagonist, sci-fi, cyberpunk">
+        <!-- Collapsible Advanced Section -->
+        <div id="character-advanced-options" class="compound-collapsible" style="display: none;">
+          <div class="compound-panel">
+            <div class="compound-panel-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Visual Traits & Lore</div>
+            <div class="form-group">
+              <label for="character-traits">Visual Traits & Consistency Keywords</label>
+              <input type="text" id="character-traits" class="form-input form-input-dense" placeholder="e.g. silver undercut, amber cyber eye, leather trenchcoat">
+            </div>
+            <div class="form-group mt-2">
+              <label for="character-notes">Lore & Continuity Notes</label>
+              <textarea id="character-notes" class="form-textarea form-textarea-dense" rows="2" placeholder="Canon facts, relationship links, voice guidance..."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tags Panel -->
+        <div class="compound-panel mt-2">
+          <div class="form-group">
+            <label for="character-tags">Tags (comma separated)</label>
+            <input type="text" id="character-tags" class="form-input form-input-dense" placeholder="protagonist, sci-fi, cyberpunk">
+          </div>
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-character')">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Character</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modal-character')">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-floppy-disk"></i> Save Character</button>
         </div>
       </form>
     </div>
@@ -707,48 +1241,57 @@
 
   <!-- Link Modal -->
   <div class="modal-overlay" id="modal-link">
-    <div class="modal-box">
+    <div class="modal-box compound-modal-box">
       <div class="modal-header">
-        <h3 id="link-modal-title">New Reference Link</h3>
+        <div class="modal-title-group">
+          <i class="fa-solid fa-link modal-header-icon"></i>
+          <h3 id="link-modal-title">New Reference Link</h3>
+        </div>
         <button class="btn-close" onclick="closeModal('modal-link')"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <form id="form-link" class="modal-body">
         <input type="hidden" id="link-id">
-        <div class="form-group">
-          <label for="link-url">URL *</label>
-          <input type="url" id="link-url" class="form-input" required placeholder="https://www.youtube.com/watch?v=... or any web link">
-          <span class="form-hint">YouTube links automatically pull video title and thumbnail via oEmbed</span>
-        </div>
 
-        <div class="form-row">
-          <div class="form-group flex-2">
-            <label for="link-title">Title (Optional)</label>
-            <input type="text" id="link-title" class="form-input" placeholder="Auto-fetched if left blank">
+        <div class="compound-panel">
+          <div class="compound-panel-title"><i class="fa-solid fa-globe"></i> Resource Target</div>
+          <div class="form-group">
+            <label for="link-url">URL *</label>
+            <input type="url" id="link-url" class="form-input form-input-dense" required placeholder="https://www.youtube.com/watch?v=... or any web link">
+            <span class="form-hint">YouTube links automatically pull video title and thumbnail via oEmbed</span>
           </div>
-          <div class="form-group flex-1">
-            <label for="link-platform">Platform</label>
-            <input type="text" id="link-platform" class="form-input" placeholder="youtube, artstation...">
+          <div class="form-grid-2col mt-2">
+            <div class="form-group">
+              <label for="link-title">Title (Optional)</label>
+              <input type="text" id="link-title" class="form-input form-input-dense" placeholder="Auto-fetched if left blank">
+            </div>
+            <div class="form-group">
+              <label for="link-platform">Platform</label>
+              <input type="text" id="link-platform" class="form-input form-input-dense" placeholder="youtube, artstation...">
+            </div>
           </div>
         </div>
 
-        <div class="form-group">
-          <label for="link-description">Description / Reference Takeaways</label>
-          <textarea id="link-description" class="form-textarea" rows="2" placeholder="Why this link is saved, camera angles, color grading..."></textarea>
-        </div>
-
-        <div class="form-group">
-          <label for="link-thumbnail">Custom Thumbnail URL</label>
-          <input type="url" id="link-thumbnail" class="form-input" placeholder="https://... (auto-fetched for YouTube)">
-        </div>
-
-        <div class="form-group">
-          <label for="link-tags">Tags (comma separated)</label>
-          <input type="text" id="link-tags" class="form-input" placeholder="cinematography, lighting, tutorial">
+        <div class="compound-panel">
+          <div class="compound-panel-title"><i class="fa-solid fa-note-sticky"></i> Reference Details</div>
+          <div class="form-group">
+            <label for="link-description">Description / Notes</label>
+            <textarea id="link-description" class="form-textarea form-textarea-dense" rows="2" placeholder="Why this reference was saved..."></textarea>
+          </div>
+          <div class="form-grid-2col mt-2">
+            <div class="form-group">
+              <label for="link-thumbnail">Thumbnail URL</label>
+              <input type="url" id="link-thumbnail" class="form-input form-input-dense" placeholder="https://... (auto-fetched)">
+            </div>
+            <div class="form-group">
+              <label for="link-tags">Tags</label>
+              <input type="text" id="link-tags" class="form-input form-input-dense" placeholder="cinematography, lighting">
+            </div>
+          </div>
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-link')">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Reference</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modal-link')">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-floppy-disk"></i> Save Reference</button>
         </div>
       </form>
     </div>
@@ -756,43 +1299,48 @@
 
   <!-- Board Modal -->
   <div class="modal-overlay" id="modal-board">
-    <div class="modal-box">
+    <div class="modal-box compound-modal-box">
       <div class="modal-header">
-        <h3 id="board-modal-title">New Planning Board</h3>
+        <div class="modal-title-group">
+          <i class="fa-solid fa-chalkboard modal-header-icon"></i>
+          <h3 id="board-modal-title">New Planning Board</h3>
+        </div>
         <button class="btn-close" onclick="closeModal('modal-board')"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <form id="form-board" class="modal-body">
-        <div class="form-group">
-          <label for="board-name">Board Name *</label>
-          <input type="text" id="board-name" class="form-input" required placeholder="e.g. Episode 1 Visual Pitch, Cyberpunk Wardrobe">
-        </div>
-
-        <div class="form-row">
-          <div class="form-group flex-1">
-            <label for="board-style">Backdrop Grid</label>
-            <select id="board-style" class="form-select">
-              <option value="dot-grid">Dot Grid (Architectural)</option>
-              <option value="corkboard">Corkboard (Pinboard)</option>
-              <option value="graph">Graph Paper (Blueprint)</option>
-              <option value="blank">Blank (Minimal)</option>
-            </select>
+        <div class="compound-panel">
+          <div class="compound-panel-title"><i class="fa-solid fa-pen-ruler"></i> Board Configuration</div>
+          <div class="form-group">
+            <label for="board-name">Board Name *</label>
+            <input type="text" id="board-name" class="form-input form-input-dense" required placeholder="e.g. Episode 1 Visual Pitch, Wardrobe Diagram">
           </div>
-          <div class="form-group flex-1">
-            <label for="board-theme">Color Theme</label>
-            <select id="board-theme" class="form-select">
-              <option value="default">Default App Theme</option>
-              <option value="dark">Dark Slate</option>
-              <option value="light">Crisp Light</option>
-              <option value="sepia">Warm Sepia</option>
-              <option value="pastel">Pastel</option>
-              <option value="cyberpunk">Cyberpunk Neon</option>
-            </select>
+          <div class="form-grid-2col mt-2">
+            <div class="form-group">
+              <label for="board-style">Backdrop Grid</label>
+              <select id="board-style" class="form-select form-select-dense">
+                <option value="dot-grid">Dot Grid (Architectural)</option>
+                <option value="corkboard">Corkboard (Pinboard)</option>
+                <option value="graph">Graph Paper (Blueprint)</option>
+                <option value="blank">Blank (Minimal)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="board-theme">Color Theme</label>
+              <select id="board-theme" class="form-select form-select-dense">
+                <option value="default">Default App Theme</option>
+                <option value="dark">Dark Slate</option>
+                <option value="light">Crisp Light</option>
+                <option value="sepia">Warm Sepia</option>
+                <option value="pastel">Pastel</option>
+                <option value="cyberpunk">Cyberpunk Neon</option>
+              </select>
+            </div>
           </div>
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-board')">Cancel</button>
-          <button type="submit" class="btn btn-primary">Create Board</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modal-board')">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-plus"></i> Create Board</button>
         </div>
       </form>
     </div>
@@ -800,34 +1348,43 @@
 
   <!-- Project Modal -->
   <div class="modal-overlay" id="modal-project">
-    <div class="modal-box">
+    <div class="modal-box compound-modal-box">
       <div class="modal-header">
-        <h3 id="project-modal-title">New Workspace Project</h3>
+        <div class="modal-title-group">
+          <i class="fa-solid fa-folder-tree modal-header-icon"></i>
+          <h3 id="project-modal-title">New Workspace Project</h3>
+        </div>
         <button class="btn-close" onclick="closeModal('modal-project')"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <form id="form-project" class="modal-body">
         <input type="hidden" id="project-id">
-        <div class="form-group">
-          <label for="project-name">Project Name *</label>
-          <input type="text" id="project-name" class="form-input" required placeholder="e.g. Season 1 Pitch, Sci-Fi Worldbuilding">
+        <div class="compound-panel">
+          <div class="compound-panel-title"><i class="fa-solid fa-circle-info"></i> Project Details</div>
+          <div class="form-row form-row-dense">
+            <div class="form-group flex-2">
+              <label for="project-name">Project Name *</label>
+              <input type="text" id="project-name" class="form-input form-input-dense" required placeholder="e.g. Season 1 Pitch, Sci-Fi Worldbuilding">
+            </div>
+            <div class="form-group flex-1">
+              <label for="project-status">Project Status</label>
+              <select id="project-status" class="form-select form-select-dense">
+                <option value="Draft">Draft</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Review">Review</option>
+                <option value="Completed">Completed</option>
+                <option value="Archived">Archived</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group mt-2">
+            <label for="project-description">Project Description</label>
+            <textarea id="project-description" class="form-textarea form-textarea-dense" rows="3" placeholder="Core vision, creative parameters, target deliverables..."></textarea>
+          </div>
         </div>
-        <div class="form-group">
-          <label for="project-description">Project Description</label>
-          <textarea id="project-description" class="form-textarea" rows="3" placeholder="Core vision, creative parameters, target deliverables..."></textarea>
-        </div>
-        <div class="form-group">
-          <label for="project-status">Project Status</label>
-          <select id="project-status" class="form-select">
-            <option value="Draft">Draft</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Review">Review</option>
-            <option value="Completed">Completed</option>
-            <option value="Archived">Archived</option>
-          </select>
-        </div>
+
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-project')">Cancel</button>
-          <button type="submit" class="btn btn-primary" id="btn-save-project">Save Project</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modal-project')">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm" id="btn-save-project"><i class="fa-solid fa-floppy-disk"></i> Save Project</button>
         </div>
       </form>
     </div>
@@ -835,51 +1392,62 @@
 
   <!-- Production Part Modal -->
   <div class="modal-overlay" id="modal-part">
-    <div class="modal-box modal-lg">
+    <div class="modal-box modal-lg compound-modal-box">
       <div class="modal-header">
-        <h3 id="part-modal-title">New Production Part</h3>
+        <div class="modal-title-group">
+          <i class="fa-solid fa-film modal-header-icon"></i>
+          <h3 id="part-modal-title">New Production Part</h3>
+        </div>
         <button class="btn-close" onclick="closeModal('modal-part')"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <form id="form-part" class="modal-body">
         <input type="hidden" id="part-id">
-        <div class="form-row">
-          <div class="form-group flex-2">
-            <label for="part-title">Part Title *</label>
-            <input type="text" id="part-title" class="form-input" required placeholder="e.g. Scene 1 - Cyber Alleyway Encounter">
+
+        <div class="compound-panel">
+          <div class="compound-panel-title"><i class="fa-solid fa-clapperboard"></i> Scene Definition</div>
+          <div class="form-row form-row-dense">
+            <div class="form-group flex-2">
+              <label for="part-title">Part Title *</label>
+              <input type="text" id="part-title" class="form-input form-input-dense" required placeholder="e.g. Scene 1 - Cyber Alleyway Encounter">
+            </div>
+            <div class="form-group flex-1">
+              <label for="part-type">Part Type</label>
+              <select id="part-type" class="form-select form-select-dense">
+                <option value="scene">Scene</option>
+                <option value="chapter">Chapter</option>
+                <option value="segment">Segment</option>
+                <option value="voiceover">Voiceover</option>
+                <option value="note">Production Note</option>
+              </select>
+            </div>
           </div>
-          <div class="form-group flex-1">
-            <label for="part-type">Part Type</label>
-            <select id="part-type" class="form-select">
-              <option value="scene">Scene</option>
-              <option value="chapter">Chapter</option>
-              <option value="segment">Segment</option>
-              <option value="voiceover">Voiceover</option>
-              <option value="note">Production Note</option>
-            </select>
+          <div class="form-grid-2col mt-2">
+            <div class="form-group">
+              <label for="part-status">Status</label>
+              <select id="part-status" class="form-select form-select-dense">
+                <option value="Draft">Draft</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Ready">Ready</option>
+                <option value="Done">Done</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="part-sequence">Sequence Order #</label>
+              <input type="number" id="part-sequence" class="form-input form-input-dense" min="1" value="1">
+            </div>
           </div>
         </div>
-        <div class="form-row">
-          <div class="form-group flex-1">
-            <label for="part-status">Status</label>
-            <select id="part-status" class="form-select">
-              <option value="Draft">Draft</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Ready">Ready</option>
-              <option value="Done">Done</option>
-            </select>
-          </div>
-          <div class="form-group flex-1">
-            <label for="part-sequence">Sequence Order #</label>
-            <input type="number" id="part-sequence" class="form-input" min="1" value="1">
+
+        <div class="compound-panel">
+          <div class="compound-panel-title"><i class="fa-solid fa-scroll"></i> Script Excerpt & Directives</div>
+          <div class="form-group">
+            <textarea id="part-content" class="form-textarea form-textarea-dense code-font" rows="4" placeholder="Write scene script, beats, lighting directives, voice cues..."></textarea>
           </div>
         </div>
-        <div class="form-group">
-          <label for="part-content">Script Excerpt / Scene Breakdown / Lore</label>
-          <textarea id="part-content" class="form-textarea code-font" rows="5" placeholder="Write scene script, beats, lighting directives, voice cues..."></textarea>
-        </div>
+
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-part')">Cancel</button>
-          <button type="submit" class="btn btn-primary" id="btn-save-part">Save Part</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modal-part')">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm" id="btn-save-part"><i class="fa-solid fa-floppy-disk"></i> Save Part</button>
         </div>
       </form>
     </div>
@@ -887,35 +1455,45 @@
 
   <!-- Link Entity Modal -->
   <div class="modal-overlay" id="modal-link-entity">
-    <div class="modal-box">
+    <div class="modal-box compound-modal-box">
       <div class="modal-header">
-        <h3 id="link-entity-modal-title">Link Asset to Part</h3>
+        <div class="modal-title-group">
+          <i class="fa-solid fa-link modal-header-icon"></i>
+          <h3 id="link-entity-modal-title">Link Asset to Part</h3>
+        </div>
         <button class="btn-close" onclick="closeModal('modal-link-entity')"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <form id="form-link-entity" class="modal-body">
         <input type="hidden" id="link-entity-part-id">
-        <div class="form-group">
-          <label for="link-entity-type">Asset Type</label>
-          <select id="link-entity-type" class="form-select">
-            <option value="character">Character Persona</option>
-            <option value="prompt">Prompt Template</option>
-            <option value="link">Reference Link</option>
-            <option value="board">Visual Board</option>
-          </select>
+
+        <div class="compound-panel">
+          <div class="compound-panel-title"><i class="fa-solid fa-cubes"></i> Asset Selection</div>
+          <div class="form-grid-2col">
+            <div class="form-group">
+              <label for="link-entity-type">Asset Type</label>
+              <select id="link-entity-type" class="form-select form-select-dense">
+                <option value="character">Character Persona</option>
+                <option value="prompt">Prompt Template</option>
+                <option value="link">Reference Link</option>
+                <option value="board">Visual Board</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="link-entity-target">Select Item</label>
+              <select id="link-entity-target" class="form-select form-select-dense" required>
+                <!-- Dynamically populated -->
+              </select>
+            </div>
+          </div>
+          <div class="form-group mt-2">
+            <label for="link-entity-notes">Context Notes</label>
+            <input type="text" id="link-entity-notes" class="form-input form-input-dense" placeholder="e.g. Lead protagonist in opening sequence">
+          </div>
         </div>
-        <div class="form-group">
-          <label for="link-entity-target">Select Item</label>
-          <select id="link-entity-target" class="form-select" required>
-            <!-- Dynamically populated -->
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="link-entity-notes">Relationship / Context Notes</label>
-          <input type="text" id="link-entity-notes" class="form-input" placeholder="e.g. Lead protagonist in opening sequence">
-        </div>
+
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-link-entity')">Cancel</button>
-          <button type="submit" class="btn btn-primary">Attach Asset</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modal-link-entity')">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-paperclip"></i> Attach Asset</button>
         </div>
       </form>
     </div>
@@ -923,30 +1501,39 @@
 
   <!-- Attachment Upload Modal -->
   <div class="modal-overlay" id="modal-attachment">
-    <div class="modal-box">
+    <div class="modal-box compound-modal-box">
       <div class="modal-header">
-        <h3 id="attachment-modal-title">Upload Project Media / Addon</h3>
+        <div class="modal-title-group">
+          <i class="fa-solid fa-cloud-arrow-up modal-header-icon"></i>
+          <h3 id="attachment-modal-title">Upload Project Media / Addon</h3>
+        </div>
         <button class="btn-close" onclick="closeModal('modal-attachment')"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <form id="form-attachment" class="modal-body">
-        <div class="form-group">
-          <label for="attachment-file-input">Select File *</label>
-          <input type="file" id="attachment-file-input" class="form-input" required>
-          <span class="form-hint">Supports audio (.mp3, .wav), documents (.txt, .md, .pdf), videos (.mp4, .webm), and images (.png, .jpg)</span>
+        <div class="compound-panel">
+          <div class="compound-panel-title"><i class="fa-solid fa-file"></i> File Source</div>
+          <div class="form-group">
+            <label for="attachment-file-input">Select File *</label>
+            <input type="file" id="attachment-file-input" class="form-input form-input-dense" required>
+            <span class="form-hint">Supports audio (.mp3, .wav), documents (.txt, .md, .pdf), videos (.mp4, .webm), and images (.png, .jpg)</span>
+          </div>
+          <div class="form-grid-2col mt-2">
+            <div class="form-group">
+              <label for="attachment-part-select">Associate with Scene (Optional)</label>
+              <select id="attachment-part-select" class="form-select form-select-dense">
+                <option value="">General Project Asset</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="attachment-notes">Notes / Production Tags</label>
+              <input type="text" id="attachment-notes" class="form-input form-input-dense" placeholder="e.g. Voiceover take 2, Storyboard">
+            </div>
+          </div>
         </div>
-        <div class="form-group">
-          <label for="attachment-part-select">Associate with Part (Optional)</label>
-          <select id="attachment-part-select" class="form-select">
-            <option value="">General Project Asset (No specific part)</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="attachment-notes">Notes / Production Tags</label>
-          <input type="text" id="attachment-notes" class="form-input" placeholder="e.g. Voiceover take 2, Draft storyboard">
-        </div>
+
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-attachment')">Cancel</button>
-          <button type="submit" class="btn btn-primary" id="btn-submit-attachment">Upload File</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modal-attachment')">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm" id="btn-submit-attachment"><i class="fa-solid fa-upload"></i> Upload File</button>
         </div>
       </form>
     </div>
@@ -954,36 +1541,48 @@
 
   <!-- Merge Projects Modal -->
   <div class="modal-overlay" id="modal-merge">
-    <div class="modal-box">
+    <div class="modal-box compound-modal-box">
       <div class="modal-header">
-        <h3>Merge Project Workspace</h3>
+        <div class="modal-title-group">
+          <i class="fa-solid fa-code-merge modal-header-icon"></i>
+          <h3>Merge Project Workspace</h3>
+        </div>
         <button class="btn-close" onclick="closeModal('modal-merge')"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <form id="form-merge" class="modal-body">
         <input type="hidden" id="merge-source-id">
-        <div class="form-group">
-          <label>Source Project</label>
-          <div class="form-static-val" id="merge-source-label">Project Name</div>
+
+        <div class="compound-panel">
+          <div class="compound-panel-title"><i class="fa-solid fa-shuffle"></i> Workspace Pairing</div>
+          <div class="form-group">
+            <label>Source Workspace</label>
+            <div class="form-static-val" id="merge-source-label">Project Name</div>
+          </div>
+          <div class="form-group mt-2">
+            <label for="merge-target-select">Merge Into Target Workspace *</label>
+            <select id="merge-target-select" class="form-select form-select-dense" required>
+              <!-- Populated by JS -->
+            </select>
+          </div>
         </div>
-        <div class="form-group">
-          <label for="merge-target-select">Merge Into Target Project *</label>
-          <select id="merge-target-select" class="form-select" required>
-            <!-- Populated by JS -->
-          </select>
+
+        <div class="compound-panel">
+          <div class="compound-panel-title"><i class="fa-solid fa-sliders"></i> Merge Directives</div>
+          <div class="form-group checkbox-group">
+            <label>
+              <input type="checkbox" id="merge-rename-conflicts" checked> Auto-suffix duplicate titles with (Merged)
+            </label>
+          </div>
+          <div class="form-group checkbox-group mt-1">
+            <label>
+              <input type="checkbox" id="merge-copy-media" checked> Copy associated media and addon files
+            </label>
+          </div>
         </div>
-        <div class="form-group checkbox-group">
-          <label>
-            <input type="checkbox" id="merge-rename-conflicts" checked> Auto-suffix duplicate titles with (Merged)
-          </label>
-        </div>
-        <div class="form-group checkbox-group">
-          <label>
-            <input type="checkbox" id="merge-copy-media" checked> Copy associated media and addon files
-          </label>
-        </div>
+
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-merge')">Cancel</button>
-          <button type="submit" class="btn btn-primary">Merge Workspaces</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modal-merge')">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-code-merge"></i> Merge Workspaces</button>
         </div>
       </form>
     </div>
@@ -991,16 +1590,19 @@
 
   <!-- Visual Transfer Workbench Modal -->
   <div class="modal-overlay" id="modal-transfer">
-    <div class="modal-box modal-xl">
+    <div class="modal-box modal-xl compound-modal-box">
       <div class="modal-header">
-        <h3>Visual Transfer Workbench</h3>
+        <div class="modal-title-group">
+          <i class="fa-solid fa-arrows-split-up-and-left modal-header-icon"></i>
+          <h3>Visual Transfer Workbench</h3>
+        </div>
         <button class="btn-close" onclick="closeModal('modal-transfer')"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="modal-body transfer-workbench-body">
-        <div class="transfer-toolbar">
+        <div class="transfer-toolbar compound-panel">
           <div class="transfer-side-header">
             <label for="transfer-source-select">Source Workspace:</label>
-            <select id="transfer-source-select" class="form-select select-compact"></select>
+            <select id="transfer-source-select" class="form-select form-select-dense"></select>
           </div>
           <div class="transfer-mode-selector">
             <label class="radio-label">
@@ -1012,15 +1614,15 @@
           </div>
           <div class="transfer-side-header">
             <label for="transfer-target-select">Target Workspace:</label>
-            <select id="transfer-target-select" class="form-select select-compact"></select>
+            <select id="transfer-target-select" class="form-select form-select-dense"></select>
           </div>
         </div>
 
         <div class="transfer-dual-pane">
-          <div class="transfer-pane" id="transfer-source-pane">
+          <div class="transfer-pane compound-panel" id="transfer-source-pane">
             <div class="transfer-pane-header">
               <span>Source Items</span>
-              <button type="button" class="btn btn-xs btn-outline" id="btn-transfer-select-all">Select All</button>
+              <button type="button" class="btn btn-xs btn-outline" id="btn-transfer-select-all"><i class="fa-solid fa-check-double"></i> Select All</button>
             </div>
             <div class="transfer-items-container" id="transfer-items-list">
               <!-- Checkboxes for Prompts, Characters, Links, Boards, Parts -->
@@ -1029,7 +1631,7 @@
           <div class="transfer-pane-arrow">
             <i class="fa-solid fa-arrow-right"></i>
           </div>
-          <div class="transfer-pane" id="transfer-target-pane">
+          <div class="transfer-pane compound-panel" id="transfer-target-pane">
             <div class="transfer-pane-header">
               <span>Target Workspace Overview</span>
             </div>
@@ -1040,15 +1642,15 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-transfer')">Cancel</button>
-        <button type="button" class="btn btn-primary" id="btn-execute-transfer"><i class="fa-solid fa-arrows-split-up-and-left"></i> Execute Transfer</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modal-transfer')">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btn-execute-transfer"><i class="fa-solid fa-arrows-split-up-and-left"></i> Execute Transfer</button>
       </div>
     </div>
   </div>
 
   <!-- Media Viewer Modal -->
   <div class="modal-overlay" id="modal-media-viewer">
-    <div class="modal-box modal-lg">
+    <div class="modal-box modal-lg compound-modal-box">
       <div class="modal-header">
         <div class="media-title-group">
           <span class="badge badge-primary" id="media-viewer-badge">Media</span>
@@ -1058,7 +1660,7 @@
       </div>
       <div class="modal-body media-viewer-body">
         <!-- Audio Player View -->
-        <div id="media-audio-player" class="media-player-block" style="display: none;">
+        <div id="media-audio-player" class="media-player-block compound-panel" style="display: none;">
           <audio id="audio-playback-el" controls class="w-100"></audio>
           <div class="audio-speed-controls">
             <span class="speed-label">Speed:</span>
@@ -1071,7 +1673,7 @@
         </div>
 
         <!-- Script / Monospace Text Reader -->
-        <div id="media-script-reader" class="media-player-block" style="display: none;">
+        <div id="media-script-reader" class="media-player-block compound-panel" style="display: none;">
           <div class="script-reader-toolbar">
             <button type="button" class="btn btn-xs btn-outline" id="btn-script-copy"><i class="fa-solid fa-copy"></i> Copy Text</button>
             <button type="button" class="btn btn-xs btn-outline" id="btn-script-font-dec"><i class="fa-solid fa-font"></i> A-</button>
@@ -1081,24 +1683,49 @@
         </div>
 
         <!-- PDF Frame Viewer -->
-        <div id="media-pdf-viewer" class="media-player-block" style="display: none;">
+        <div id="media-pdf-viewer" class="media-player-block compound-panel" style="display: none;">
           <iframe id="pdf-viewer-frame" class="pdf-viewer-frame"></iframe>
         </div>
 
         <!-- Video Player View -->
-        <div id="media-video-player" class="media-player-block" style="display: none;">
+        <div id="media-video-player" class="media-player-block compound-panel" style="display: none;">
           <video id="video-playback-el" controls class="video-playback-el"></video>
         </div>
 
         <!-- Image Viewer View -->
-        <div id="media-image-viewer" class="media-player-block" style="display: none;">
+        <div id="media-image-viewer" class="media-player-block compound-panel" style="display: none;">
           <img id="image-playback-el" class="image-playback-el" alt="Preview">
         </div>
       </div>
       <div class="modal-footer media-viewer-footer">
-        <button type="button" class="btn btn-secondary" id="btn-media-reveal"><i class="fa-solid fa-folder-open"></i> Reveal in Explorer</button>
-        <button type="button" class="btn btn-outline" id="btn-media-permalink"><i class="fa-solid fa-link"></i> Copy Permalink</button>
-        <a id="btn-media-download-link" class="btn btn-primary" download><i class="fa-solid fa-download"></i> Download</a>
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-media-reveal"><i class="fa-solid fa-folder-open"></i> Reveal in Explorer</button>
+        <button type="button" class="btn btn-outline btn-sm" id="btn-media-permalink"><i class="fa-solid fa-link"></i> Copy Permalink</button>
+        <a id="btn-media-download-link" class="btn btn-primary btn-sm" download><i class="fa-solid fa-download"></i> Download</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Modal (12th Compound Modal) -->
+  <div class="modal-overlay" id="modal-confirm">
+    <div class="modal-box modal-sm compound-modal-box">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <i class="fa-solid fa-triangle-exclamation text-warning modal-header-icon"></i>
+          <h3 id="confirm-modal-title">Confirm Action</h3>
+        </div>
+        <button class="btn-close" onclick="closeModal('modal-confirm')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="compound-panel">
+          <p id="confirm-modal-message" class="confirm-message-text">Are you sure you want to proceed?</p>
+          <div id="confirm-modal-input-group" style="display: none; margin-top: 0.75rem;">
+            <input type="text" id="confirm-modal-input" class="form-input form-input-dense" placeholder="Enter value...">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-confirm-cancel" onclick="closeModal('modal-confirm')">Cancel</button>
+        <button type="button" class="btn btn-danger btn-sm" id="btn-confirm-proceed"><i class="fa-solid fa-check"></i> Confirm</button>
       </div>
     </div>
   </div>

@@ -1,3 +1,4 @@
+pub mod ai;
 pub mod attachments;
 pub mod backup;
 pub mod boards;
@@ -8,6 +9,7 @@ pub mod parts;
 pub mod projects;
 pub mod prompts;
 pub mod search;
+pub mod settings;
 pub mod tags;
 pub mod upload;
 

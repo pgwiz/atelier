@@ -531,34 +531,80 @@ The board uses an SVG container and an HTML cards container stacked inside a mas
 - [x] **8.3** Comprehensive end-to-end verification of all user workflows in browser
 
 ### Phase 9: Projects, Production Parts & Multi-Workspace Operations
-- [ ] **9.1 Database Schema Migration & Storage Architecture**:
+- [x] **9.1 Database Schema Migration & Storage Architecture**:
   - Add `projects` table (seeded with 'Default Studio'), `project_parts` table, `part_entities` junction table, and `project_attachments` table.
   - Add `project_id` and `updated_at` to `prompts`, `characters`, `links`, `boards`.
   - Add `completed_at` to `project_parts` and support `entity_type: 'part'` in `board_items`.
   - Implement dual storage generator: auto-create `data/projects/<id>/{audio,documents,images,videos,exports}` and maintain auto-synced `project.json` manifest.
-- [ ] **9.2 Backend Models & Handlers**:
+- [x] **9.2 Backend Models & Handlers**:
   - Implement `src/handlers/projects.rs`: CRUD, statistics aggregation (`GET /api/projects`), duplicate/copy (`POST /api/projects/:id/copy`), non-destructive merge (`POST /api/projects/:id/merge`), visual transfer (`POST /api/projects/transfer`), reload from disk (`POST /api/projects/:id/reload-json`), single-project export (`GET /api/projects/:id/export`), and project import (`POST /api/projects/import`).
   - Implement `src/handlers/parts.rs`: CRUD for parts (`GET/POST /api/projects/:id/parts`, `PUT/DELETE /api/parts/:id`), quick status toggle (`PATCH /api/parts/:id/status`), reordering (`POST /api/projects/:id/parts/reorder`), and linked entity attachment (`POST/DELETE /api/parts/:id/entities`).
   - Implement `src/handlers/attachments.rs`: Upload and management for custom addons (audio, documents, scripts, media), with raw file streaming at `/files/projects/:id/*`.
   - Implement `src/handlers/filesystem.rs`: Path-traversal safe native OS File Explorer invocation (`POST /api/fs/reveal` and `POST /api/projects/:id/open-folder`).
   - Update `prompts.rs`, `characters.rs`, `links.rs`, `boards.rs`, `search.rs` to filter by `project_id`.
-- [ ] **9.3 Frontend Projects Dashboard & Sidebar Switcher**:
+- [x] **9.3 Frontend Projects Dashboard & Sidebar Switcher**:
   - Dedicated Project Switcher in sidebar directly below header: active project pill with name, status badge, dropdown with stat chips and action buttons; shrinks to 36x36px icon with colored status dot in compressed navbar.
   - Central Projects Dashboard view with project cards, progress bars, entity counts, timestamps, "Open Project Folder", and quick action buttons.
-- [ ] **9.4 Production Parts View & Custom Addon Viewers**:
+- [x] **9.4 Production Parts View & Custom Addon Viewers**:
   - Dedicated Parts / Scene timeline view with status badges, linked characters/prompts/references chips, drag-and-drop reordering, and create/edit modal.
   - Custom Addon panel: Audio player with playback speed controls (`.mp3`, `.wav`), Document/script viewer (`.txt`, `.md`, `.fountain`, `.pdf` iframe), and Video player (`.mp4`, `.webm`).
   - "Open File Location" button on each attachment card.
-- [ ] **9.5 Canvas Mini Parts Integration**:
+- [x] **9.5 Canvas Mini Parts Integration**:
   - Render interactive 'part' cards on the planning canvas showing part title, clickable status badge, linked character avatars, and connection anchors for sequence arrows.
   - Include Parts in canvas resource drawer.
-- [ ] **9.6 Visual Transfer Workbench & Merge Dialog**:
+- [x] **9.6 Visual Transfer Workbench & Merge Dialog**:
   - Dual-pane transfer modal (Source vs Target) with item checkboxes to Move or Copy across projects.
   - Merge project dialog with conflict handling (suffixing duplicate names) and source project retention toggle.
-- [ ] **9.7 Deep-Linking Permalinks & Navigation**:
+- [x] **9.7 Deep-Linking Permalinks & Navigation**:
   - Hash-based deep link router (`/#/projects/:id`, `/#/projects/:id/parts/:part_id`, `/#/projects/:id/boards/:board_id`).
   - "Copy Permalink" action button with clipboard confirmation.
-- [ ] **9.8 Test Suite & Verification**:
+- [x] **9.8 Test Suite & Verification**:
   - Integration tests covering project creation, copy, merge, visual transfer, parts management, custom addon uploads, and single-project export/import.
+
+### Phase 10: Project Card Redesign, Project Hub, AI Assistant & Canvas Overhaul
+- [x] **10.1 Backend Settings API & Project Activity Feed**:
+  - Add `settings` key-value table to SQLite in `src/db.rs`.
+  - Implement `src/handlers/settings.rs` (`GET /api/settings`, `PUT /api/settings/:key`, `POST /api/settings/bulk`).
+  - Implement `GET /api/projects/:id/activity` in `src/handlers/projects.rs` returning aggregated chronological activity ("What Changed").
+  - Implement AI chat proxy endpoint `POST /api/ai/chat` in `src/handlers/ai.rs`.
+  - Register new routes in `src/lib.rs`.
+- [x] **10.2 Redesigned Project Card Display**:
+  - Eliminate cluttered button grid and fix missing/square icons with verified Font Awesome 6 icons.
+  - Prominent primary **"Open Project"** button navigating directly to Project Hub.
+  - Sleek 3-dots actions dropdown menu (`fa-solid fa-ellipsis-vertical`) housing Open Folder, Reload JSON, Copy, Merge, Transfer, Export ZIP, Edit, and Delete.
+  - Interactive category stat chips navigating directly to that entity view.
+- [x] **10.3 Aesthetic Compound Popup & Modal Overhaul (All 12 Modals)**:
+  - Rework all modals with segmented `.compound-panel` containers, dense 2-column input grids, integrated labels, and space-efficient footers.
+  - Add collapsible "Advanced Options / Parameters" toggle to Prompt and Character modals to eliminate unnecessary vertical scrolling.
+  - Max 8px border-radius and zero gradients strictly enforced across all popup containers, inputs, and buttons.
+- [x] **10.4 Dedicated Project Hub Page (`#view-project-hub`)**:
+  - Top management banner with active project details, status pill, folder path, and quick action buttons.
+  - Category Directives Hub: 5 large interactive cards (Parts, Prompts, Characters, Media, Boards) with counts and one-click navigation.
+  - Sortable "What Changed" recent activity feed: timeline with sorting by Most Recent, Type, and Title.
+- [x] **10.5 Advanced Settings Tab (`#view-settings`)**:
+  - Layout Card: Left Sidebar vs. Futuristic Bottom Floating Dock, Futuristic Chamfered Edges toggle.
+  - Ambient Background Animation Card: ON/OFF toggle, Crimson Red `#dc2626` preset (and Amber, Cyan, Purple, custom hex), speed slider, intensity wash.
+  - Global Themes Card: 5 themes (`dark`, `light`, `sepia`, `pastel`, `cyberpunk`).
+  - Advanced AI & API Keys Card: Provider selector (OpenRouter, OpenAI, Anthropic, Gemini, Groq, Ollama), masked API key input with eye toggle, model selector, test connection.
+  - Studio Data & Backup overview.
+- [x] **10.6 Slide-Out AI Assistant Drawer (`#ai-chat-drawer`)**:
+  - Accessible via magic wand icon button in header and bottom dock.
+  - Context-aware brainstorming for prompts, characters, and scene parts.
+  - One-click "Add to Project" buttons on AI responses (Save as Prompt, Save as Character, Add Scene Part).
+- [x] **10.7 Futuristic Bottom Floating Dock with Arrow-Up Drawer**:
+  - Centered floating bottom dock (`#bottom-dock`) with navigation icons and tooltips.
+  - Arrow-up expand button (`fa-chevron-up`) sliding up drawer (`#dock-expand-drawer`) showing active project, stat chips, and quick actions.
+  - Cyberpunk Futuristic Chamfered Edges (`clip-path: polygon(...)`, max 8px bounds, zero gradients).
+- [x] **10.8 Ambient Background Fade Color Animation**:
+  - Fullscreen `#ambient-fade-overlay` element with solid color keyframe breathing fade.
+  - Zero gradients, real-time live preview in Settings.
+- [x] **10.9 Planning Board & Floating Text Overhaul**:
+  - Contextual dynamic mouse cursors: crosshair for pen/shapes/connector, text for text tool, cell for sticky notes, move on selected items, se-resize on resize handles.
+  - Seamless inline canvas text editor (no browser `prompt()`), with auto-focus, Enter to commit, and double-click to edit existing text.
+  - Enable dragging and moving for selected SVG elements (shapes, floating text, freehand strokes) with arrow keys nudging (10px / 1px).
+  - Comprehensive audit and stabilization of all board operations.
+- [x] **10.10 Automated Testing & Verification**:
+  - Integration tests in `tests/api_tests.rs` for settings CRUD, activity feed, and AI proxy validation.
+  - Verification of Compound Modals, Project Card actions, Project Hub navigation, AI Assistant drawer, canvas text/cursors, and zero-gradient compliance.
 
 

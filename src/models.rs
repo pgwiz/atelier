@@ -531,3 +531,73 @@ pub struct SingleBoardExport {
     pub board: Board,
     pub items: Vec<BoardItem>,
 }
+
+// ==========================================
+// Settings Models
+// ==========================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SettingItem {
+    pub key: String,
+    pub value: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SetSettingDto {
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct BulkSettingsDto {
+    #[serde(default)]
+    pub settings: Option<HashMap<String, String>>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, String>,
+}
+
+// ==========================================
+// Project Activity Feed
+// ==========================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectActivityItem {
+    pub id: String,
+    pub entity_type: String, // "part" | "prompt" | "character" | "link" | "board" | "attachment" | "project"
+    pub entity_id: i64,
+    pub title: String,
+    pub action: String, // "Created" | "Updated" | "Completed"
+    pub timestamp: String,
+    pub details: Option<String>,
+}
+
+// ==========================================
+// AI Assistant Models
+// ==========================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AiChatMessage {
+    pub role: String, // "system" | "user" | "assistant"
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AiChatRequest {
+    pub provider: Option<String>,
+    pub api_key: Option<String>,
+    pub model: Option<String>,
+    pub base_url: Option<String>,
+    pub messages: Vec<AiChatMessage>,
+    pub temperature: Option<f32>,
+    pub max_tokens: Option<u32>,
+    pub test_connection: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AiChatResponse {
+    pub content: String,
+    pub model: String,
+    pub provider: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usage: Option<serde_json::Value>,
+}

@@ -1612,3 +1612,211 @@ async fn test_phase9_reload_json_with_new_unassigned_entities() {
     assert_eq!(chars[0].name, "External Hero");
     assert!(chars[0].id > 0);
 }
+
+#[tokio::test]
+async fn test_phase10_settings_crud_and_bulk() {
+    let (app, _state, _dir) = setup_test_app().await;
+
+    // 1. Initial settings should be accessible
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/settings")
+        .body(Body::empty())
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 2. Set a setting
+    let req = Request::builder()
+        .method("PUT")
+        .uri("/api/settings/ai_provider")
+        .header("Content-Type", "application/json")
+        .body(Body::from(json!({ "value": "openrouter" }).to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let item: serde_json::Value = serde_json::from_slice(&resp.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    assert_eq!(item["key"], "ai_provider");
+    assert_eq!(item["value"], "openrouter");
+
+    // 3. Get single setting
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/settings/ai_provider")
+        .body(Body::empty())
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let item: serde_json::Value = serde_json::from_slice(&resp.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    assert_eq!(item["value"], "openrouter");
+
+    // 4. Bulk update
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/settings/bulk")
+        .header("Content-Type", "application/json")
+        .body(Body::from(json!({
+            "settings": {
+                "ai_model": "anthropic/claude-3.5-sonnet",
+                "ambient_color": "#dc2626",
+                "ambient_speed": "8s"
+            }
+        }).to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let all: std::collections::HashMap<String, String> = serde_json::from_slice(&resp.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    assert_eq!(all.get("ai_provider").unwrap(), "openrouter");
+    // 5. POST /api/settings with single {key, value}
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/settings")
+        .header("Content-Type", "application/json")
+        .body(Body::from(json!({
+            "key": "layout_mode",
+            "value": "dock"
+        }).to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/settings/layout_mode")
+        .body(Body::empty())
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let item: serde_json::Value = serde_json::from_slice(&resp.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    assert_eq!(item["value"], "dock");
+}
+
+#[tokio::test]
+async fn test_phase10_project_activity_feed() {
+    let (app, _state, _dir) = setup_test_app().await;
+
+    // 1. Non-existent project returns 404
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/projects/99999/activity")
+        .body(Body::empty())
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+
+    // 2. Create a project
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/projects")
+        .header("Content-Type", "application/json")
+        .body(Body::from(json!({ "name": "Activity Test Studio" }).to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    let proj: Project = serde_json::from_slice(&resp.into_body().collect().await.unwrap().to_bytes()).unwrap();
+
+    // 3. Add a part
+    let req = Request::builder()
+        .method("POST")
+        .uri(format!("/api/projects/{}/parts", proj.id))
+        .header("Content-Type", "application/json")
+        .body(Body::from(json!({ "title": "Scene 1: Opening Shot", "part_type": "scene" }).to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::CREATED);
+
+    // 4. Add a prompt
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/prompts")
+        .header("Content-Type", "application/json")
+        .body(Body::from(json!({ "project_id": proj.id, "title": "Cyberpunk Sunset", "body": "Neon streets..." }).to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::CREATED);
+
+    // 5. Fetch activity feed
+    let req = Request::builder()
+        .method("GET")
+        .uri(format!("/api/projects/{}/activity", proj.id))
+        .body(Body::empty())
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let activities: Vec<serde_json::Value> = serde_json::from_slice(&resp.into_body().collect().await.unwrap().to_bytes()).unwrap();
+
+    // Should have activities for project creation, part creation, prompt creation
+    assert!(activities.len() >= 3);
+    let titles: Vec<&str> = activities.iter().map(|a| a["title"].as_str().unwrap()).collect();
+    assert!(titles.contains(&"Activity Test Studio"));
+    assert!(titles.contains(&"Scene 1: Opening Shot"));
+    assert!(titles.contains(&"Cyberpunk Sunset"));
+}
+
+#[tokio::test]
+async fn test_phase10_ai_proxy_validation() {
+    let (app, _state, _dir) = setup_test_app().await;
+
+    // 1. Missing API key should return 400 Bad Request
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/ai/chat")
+        .header("Content-Type", "application/json")
+        .body(Body::from(json!({
+            "provider": "openrouter",
+            "api_key": "",
+            "messages": [{ "role": "user", "content": "Hello" }]
+        }).to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+    // 2. Unsupported provider should return 400 Bad Request
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/ai/chat")
+        .header("Content-Type", "application/json")
+        .body(Body::from(json!({
+            "provider": "nonexistent_provider",
+            "api_key": "some-key",
+            "messages": [{ "role": "user", "content": "Hello" }]
+        }).to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+    // 3. Mock mode should return a valid response without external network
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/ai/chat")
+        .header("Content-Type", "application/json")
+        .body(Body::from(json!({
+            "provider": "mock",
+            "api_key": "test-key",
+            "model": "mock-claude",
+            "messages": [{ "role": "user", "content": "Brainstorm scene ideas" }]
+        }).to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value = serde_json::from_slice(&resp.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    assert_eq!(body["provider"], "mock");
+    assert!(body["content"].as_str().unwrap().contains("Brainstorm scene ideas"));
+
+    // 4. Test connection flag in mock mode
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/ai/chat")
+        .header("Content-Type", "application/json")
+        .body(Body::from(json!({
+            "provider": "mock",
+            "api_key": "test-key",
+            "test_connection": true,
+            "messages": []
+        }).to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value = serde_json::from_slice(&resp.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    assert!(body["content"].as_str().unwrap().contains("Connection test successful"));
+}
+

@@ -29,7 +29,12 @@ document.addEventListener('DOMContentLoaded', () => {
   initProjectSwitcher();
   initNavigation();
   initModals();
+  initCompoundModals();
   initProjectsView();
+  initProjectHubView();
+  initSettingsView();
+  initBottomDock();
+  initAiChatDrawer();
   initPartsView();
   initMultiWorkspaceModals();
   initMediaViewerModal();
@@ -43,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initial data load
   refreshAllData().then(() => {
     initHashRouting();
+    loadSettingsUI();
   });
 });
 
@@ -170,6 +176,11 @@ function initProjectSwitcher() {
     if (dropdown && !dropdown.contains(e.target) && e.target !== switcherBtn) {
       dropdown.classList.remove('open');
     }
+    document.querySelectorAll('.project-card-dropdown.open').forEach((d) => {
+      if (!d.contains(e.target) && !e.target.closest('.btn-card-more')) {
+        d.classList.remove('open');
+      }
+    });
   });
 
   // Quick stat chips click -> navigate to that view
@@ -218,6 +229,11 @@ function switchView(viewName) {
     btn.classList.toggle('active', btn.dataset.view === viewName);
   });
 
+  // Update bottom dock buttons
+  document.querySelectorAll('#bottom-dock .dock-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.view === viewName);
+  });
+
   // Update view sections
   document.querySelectorAll('.view-section').forEach((sec) => {
     sec.classList.remove('active');
@@ -230,6 +246,8 @@ function switchView(viewName) {
 
   // View-specific refreshes
   if (viewName === 'projects') loadProjects();
+  if (viewName === 'project-hub') renderProjectHub();
+  if (viewName === 'settings') loadSettingsUI();
   if (viewName === 'parts') {
     loadParts();
     loadAttachments();
@@ -577,38 +595,73 @@ function renderProjectsGrid(projects) {
     progressTrack.appendChild(progressFill);
     card.appendChild(progressTrack);
 
-    // Stats
+    // Clickable Category Stat Chips
     const statsRow = document.createElement('div');
     statsRow.className = 'project-card-stats';
 
-    const statParts = document.createElement('span');
-    statParts.className = 'project-stat-pill';
+    const statParts = document.createElement('button');
+    statParts.type = 'button';
+    statParts.className = 'stat-chip-card';
     statParts.innerHTML = `<i class="fa-solid fa-film"></i> ${p.completed_parts_count || 0}/${p.parts_count || 0} Parts`;
+    statParts.title = 'Open Production Parts';
+    statParts.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await switchProject(p.id);
+      switchView('parts');
+    });
     statsRow.appendChild(statParts);
 
-    const statPrompts = document.createElement('span');
-    statPrompts.className = 'project-stat-pill';
+    const statPrompts = document.createElement('button');
+    statPrompts.type = 'button';
+    statPrompts.className = 'stat-chip-card';
     statPrompts.innerHTML = `<i class="fa-solid fa-feather-pointed"></i> ${p.prompts_count || 0} Prompts`;
+    statPrompts.title = 'Open Prompts';
+    statPrompts.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await switchProject(p.id);
+      switchView('prompts');
+    });
     statsRow.appendChild(statPrompts);
 
-    const statChars = document.createElement('span');
-    statChars.className = 'project-stat-pill';
-    statChars.innerHTML = `<i class="fa-solid fa-users"></i> ${p.characters_count || 0} Characters`;
+    const statChars = document.createElement('button');
+    statChars.type = 'button';
+    statChars.className = 'stat-chip-card';
+    statChars.innerHTML = `<i class="fa-solid fa-users"></i> ${p.characters_count || 0} Cast`;
+    statChars.title = 'Open Characters';
+    statChars.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await switchProject(p.id);
+      switchView('characters');
+    });
     statsRow.appendChild(statChars);
 
-    const statLinks = document.createElement('span');
-    statLinks.className = 'project-stat-pill';
-    statLinks.innerHTML = `<i class="fa-solid fa-link"></i> ${p.links_count || 0} References`;
+    const statLinks = document.createElement('button');
+    statLinks.type = 'button';
+    statLinks.className = 'stat-chip-card';
+    statLinks.innerHTML = `<i class="fa-solid fa-link"></i> ${p.links_count || 0} Refs`;
+    statLinks.title = 'Open References';
+    statLinks.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await switchProject(p.id);
+      switchView('links');
+    });
     statsRow.appendChild(statLinks);
 
-    const statBoards = document.createElement('span');
-    statBoards.className = 'project-stat-pill';
+    const statBoards = document.createElement('button');
+    statBoards.type = 'button';
+    statBoards.className = 'stat-chip-card';
     statBoards.innerHTML = `<i class="fa-solid fa-chalkboard"></i> ${p.boards_count || 0} Boards`;
+    statBoards.title = 'Open Planning Boards';
+    statBoards.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await switchProject(p.id);
+      switchView('boards');
+    });
     statsRow.appendChild(statBoards);
 
     card.appendChild(statsRow);
 
-    // Footer & Actions
+    // Footer with Primary Open Project Button & Sleek 3-Dots Dropdown
     const footer = document.createElement('div');
     footer.className = 'project-card-footer';
 
@@ -620,99 +673,71 @@ function renderProjectsGrid(projects) {
     footer.appendChild(dateSpan);
 
     const actions = document.createElement('div');
-    actions.className = 'project-card-actions';
+    actions.className = 'project-card-primary-action';
 
-    if (p.id !== state.activeProjectId) {
-      const selectBtn = document.createElement('button');
-      selectBtn.className = 'btn btn-xs btn-primary';
-      selectBtn.innerHTML = '<i class="fa-solid fa-check"></i> Select';
-      selectBtn.title = 'Switch active workspace to this project';
-      selectBtn.addEventListener('click', (e) => {
+    // Prominent Primary "Open Project" Button -> Project Hub
+    const openBtn = document.createElement('button');
+    openBtn.type = 'button';
+    openBtn.className = 'btn btn-primary btn-sm btn-open-project';
+    openBtn.innerHTML = '<i class="fa-solid fa-folder-open"></i> Open Project';
+    openBtn.title = 'Open dedicated Project Hub';
+    openBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await switchProject(p.id);
+      switchView('project-hub');
+    });
+    actions.appendChild(openBtn);
+
+    // Sleek 3-Dots Action Dropdown
+    const moreWrap = document.createElement('div');
+    moreWrap.className = 'project-card-more-wrap';
+
+    const moreBtn = document.createElement('button');
+    moreBtn.type = 'button';
+    moreBtn.className = 'btn-card-more';
+    moreBtn.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
+    moreBtn.title = 'Project Actions';
+
+    const dropdown = document.createElement('div');
+    dropdown.className = 'project-card-dropdown';
+
+    const addItem = (icon, label, onClick, isDanger = false) => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = `project-card-dropdown-item ${isDanger ? 'danger' : ''}`;
+      item.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${label}</span>`;
+      item.addEventListener('click', (e) => {
         e.stopPropagation();
-        switchProject(p.id);
+        dropdown.classList.remove('open');
+        onClick();
       });
-      actions.appendChild(selectBtn);
-    }
+      dropdown.appendChild(item);
+    };
 
-    const folderBtn = document.createElement('button');
-    folderBtn.className = 'btn btn-xs btn-outline';
-    folderBtn.innerHTML = '<i class="fa-solid fa-folder-open"></i> Open Folder';
-    folderBtn.title = 'Open Project Folder';
-    folderBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      openProjectFolder(p.id);
-    });
-    actions.appendChild(folderBtn);
+    addItem('fa-pen-to-square', 'Edit Details', () => openProjectModal(p));
+    addItem('fa-folder-open', 'Open Folder', () => openProjectFolder(p.id));
+    addItem('fa-rotate', 'Reload JSON', () => reloadProjectJson(p.id));
+    addItem('fa-file-zipper', 'Export ZIP', () => window.open(`/api/projects/${p.id}/export`, '_blank'));
+    addItem('fa-clone', 'Duplicate Project', () => copyProject(p.id));
+    addItem('fa-code-merge', 'Merge Project', () => openMergeModal(p.id));
+    addItem('fa-arrows-split-up-and-left', 'Transfer Workbench', () => openTransferWorkbench(p.id));
 
-    const reloadBtn = document.createElement('button');
-    reloadBtn.className = 'btn btn-xs btn-outline';
-    reloadBtn.innerHTML = '<i class="fa-solid fa-rotate"></i> Reload JSON';
-    reloadBtn.title = 'Reload JSON (reconcile manifest from disk)';
-    reloadBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      reloadProjectJson(p.id);
-    });
-    actions.appendChild(reloadBtn);
+    const divider = document.createElement('div');
+    divider.className = 'project-card-dropdown-divider';
+    dropdown.appendChild(divider);
 
-    const dupBtn = document.createElement('button');
-    dupBtn.className = 'btn btn-xs btn-outline';
-    dupBtn.innerHTML = '<i class="fa-solid fa-clone"></i> Copy';
-    dupBtn.title = 'Deep duplicate workspace';
-    dupBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      copyProject(p.id);
-    });
-    actions.appendChild(dupBtn);
+    addItem('fa-trash-can', 'Delete Project', () => deleteProject(p.id), true);
 
-    const mergeBtn = document.createElement('button');
-    mergeBtn.className = 'btn btn-xs btn-outline';
-    mergeBtn.innerHTML = '<i class="fa-solid fa-code-merge"></i> Merge';
-    mergeBtn.title = 'Merge into another project';
-    mergeBtn.addEventListener('click', (e) => {
+    moreBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      openMergeModal(p.id);
+      const isOpen = dropdown.classList.contains('open');
+      document.querySelectorAll('.project-card-dropdown.open').forEach((d) => d.classList.remove('open'));
+      if (!isOpen) dropdown.classList.add('open');
     });
-    actions.appendChild(mergeBtn);
 
-    const transferBtn = document.createElement('button');
-    transferBtn.className = 'btn btn-xs btn-outline';
-    transferBtn.innerHTML = '<i class="fa-solid fa-arrows-split-up-and-left"></i> Transfer';
-    transferBtn.title = 'Visual Transfer Workbench';
-    transferBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      openTransferWorkbench(p.id);
-    });
-    actions.appendChild(transferBtn);
-
-    const exportBtn = document.createElement('button');
-    exportBtn.className = 'btn btn-xs btn-outline';
-    exportBtn.innerHTML = '<i class="fa-solid fa-download"></i> Zip';
-    exportBtn.title = 'Export standalone package archive (.zip)';
-    exportBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      window.open(`/api/projects/${p.id}/export`, '_blank');
-    });
-    actions.appendChild(exportBtn);
-
-    const editBtn = document.createElement('button');
-    editBtn.className = 'action-icon-btn';
-    editBtn.innerHTML = '<i class="fa-solid fa-pen"></i>';
-    editBtn.title = 'Edit project details';
-    editBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      openProjectModal(p);
-    });
-    actions.appendChild(editBtn);
-
-    const delBtn = document.createElement('button');
-    delBtn.className = 'action-icon-btn text-danger';
-    delBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
-    delBtn.title = 'Delete project';
-    delBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      deleteProject(p.id);
-    });
-    actions.appendChild(delBtn);
+    moreWrap.appendChild(moreBtn);
+    moreWrap.appendChild(dropdown);
+    actions.appendChild(moreWrap);
 
     footer.appendChild(actions);
     card.appendChild(footer);
@@ -787,7 +812,14 @@ async function handleProjectSubmit(e) {
 }
 
 async function copyProject(id) {
-  const newName = prompt('Enter a name for the duplicated project:');
+  const p = state.projects.find((proj) => proj.id === id);
+  const defaultName = p ? `${p.name} (Copy)` : 'Duplicate Project';
+  const newName = await showPromptDialog(
+    'Duplicate Project',
+    'Enter a name for the duplicated project workspace:',
+    defaultName,
+    'e.g. My Workspace V2'
+  );
   if (!newName || !newName.trim()) return;
 
   try {
@@ -835,7 +867,13 @@ async function deleteProject(id) {
     showToast('Cannot delete the only project workspace', 'error');
     return;
   }
-  if (!confirm('Are you sure you want to delete this project workspace and all its contents?')) return;
+  const confirmed = await showConfirmDialog(
+    'Delete Project Workspace',
+    'Are you sure you want to delete this project workspace and all its contents?',
+    'Delete Workspace',
+    true
+  );
+  if (!confirmed) return;
 
   try {
     const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' });
@@ -1207,7 +1245,13 @@ async function handlePartSubmit(e) {
 }
 
 async function deletePart(id) {
-  if (!confirm('Are you sure you want to delete this production part?')) return;
+  const confirmed = await showConfirmDialog(
+    'Delete Production Part',
+    'Are you sure you want to delete this production part?',
+    'Delete Part',
+    true
+  );
+  if (!confirmed) return;
   try {
     const res = await fetch(`/api/parts/${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error(await res.text());
@@ -1455,7 +1499,13 @@ async function handleAttachmentSubmit(e) {
 }
 
 async function deleteAttachment(id) {
-  if (!confirm('Are you sure you want to delete this media attachment?')) return;
+  const confirmed = await showConfirmDialog(
+    'Delete Media Attachment',
+    'Are you sure you want to delete this media attachment? This file will be permanently removed.',
+    'Delete Attachment',
+    true
+  );
+  if (!confirmed) return;
   try {
     const res = await fetch(`/api/attachments/${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error(await res.text());
@@ -2121,6 +2171,16 @@ function openPromptModal(prompt = null) {
     favInput.checked = false;
   }
 
+  const promptToggle = document.getElementById('btn-toggle-prompt-advanced');
+  const promptAdvanced = document.getElementById('prompt-advanced-options');
+  const hasAdvanced = !!(prompt && (prompt.system_prompt || prompt.parameters || prompt.notes || prompt.character_id || prompt.model_used));
+  if (promptAdvanced) {
+    promptAdvanced.style.display = hasAdvanced ? 'block' : 'none';
+  }
+  if (promptToggle) {
+    promptToggle.classList.toggle('expanded', hasAdvanced);
+  }
+
   openModal('modal-prompt');
 }
 
@@ -2200,7 +2260,13 @@ async function togglePromptFavorite(id) {
 }
 
 async function deletePrompt(id) {
-  if (!confirm('Are you sure you want to delete this prompt?')) return;
+  const confirmed = await showConfirmDialog(
+    'Delete Prompt',
+    'Are you sure you want to delete this prompt template?',
+    'Delete Prompt',
+    true
+  );
+  if (!confirmed) return;
   try {
     const res = await fetch(`/api/prompts/${id}`, { method: 'DELETE' });
     if (res.ok) {
@@ -2420,6 +2486,16 @@ function openCharacterModal(character = null) {
     avatarPreview.innerHTML = '<span class="upload-prompt-text"><i class="fa-solid fa-cloud-arrow-up"></i> Click or drop image to upload</span>';
   }
 
+  const charToggle = document.getElementById('btn-toggle-character-advanced');
+  const charAdvanced = document.getElementById('character-advanced-options');
+  const hasCharAdvanced = !!(character && (character.traits || character.notes));
+  if (charAdvanced) {
+    charAdvanced.style.display = hasCharAdvanced ? 'block' : 'none';
+  }
+  if (charToggle) {
+    charToggle.classList.toggle('expanded', hasCharAdvanced);
+  }
+
   openModal('modal-character');
 }
 
@@ -2491,7 +2567,13 @@ async function handleCharacterSubmit(e) {
 }
 
 async function deleteCharacter(id) {
-  if (!confirm('Are you sure you want to delete this character?')) return;
+  const confirmed = await showConfirmDialog(
+    'Delete Character',
+    'Are you sure you want to delete this character?',
+    'Delete Character',
+    true
+  );
+  if (!confirmed) return;
   try {
     const res = await fetch(`/api/characters/${id}`, { method: 'DELETE' });
     if (res.ok) {
@@ -2734,7 +2816,13 @@ async function handleLinkSubmit(e) {
 }
 
 async function deleteLink(id) {
-  if (!confirm('Are you sure you want to delete this reference link?')) return;
+  const confirmed = await showConfirmDialog(
+    'Delete Reference Link',
+    'Are you sure you want to delete this reference link?',
+    'Delete Link',
+    true
+  );
+  if (!confirmed) return;
   try {
     const res = await fetch(`/api/links/${id}`, { method: 'DELETE' });
     if (res.ok) {
@@ -2943,7 +3031,13 @@ async function handleBoardSubmit(e) {
 }
 
 async function deleteBoard(id) {
-  if (!confirm('Are you sure you want to delete this board? All cards and drawings will be deleted.')) return;
+  const confirmed = await showConfirmDialog(
+    'Delete Board',
+    'Are you sure you want to delete this board? All cards and drawings will be deleted.',
+    'Delete Board',
+    true
+  );
+  if (!confirmed) return;
   try {
     const res = await fetch(`/api/boards/${id}`, { method: 'DELETE' });
     if (res.ok) {
@@ -3364,3 +3458,1059 @@ function debounce(fn, wait) {
     timer = setTimeout(() => fn.apply(this, args), wait);
   };
 }
+
+// ===================================================
+// PHASE 10: CONFIRMATION DIALOG & COMPOUND MODALS
+// ===================================================
+
+function showConfirmDialog(title, message, proceedText = 'Proceed', isDanger = true) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('modal-confirm');
+    const titleEl = document.getElementById('confirm-modal-title');
+    const messageEl = document.getElementById('confirm-modal-message');
+    const proceedBtn = document.getElementById('btn-confirm-proceed') || document.getElementById('btn-confirm-ok');
+    const cancelBtn = document.getElementById('btn-confirm-cancel');
+    const inputGroup = document.getElementById('confirm-modal-input-group');
+
+    if (!modal) {
+      resolve(window.confirm(message));
+      return;
+    }
+
+    if (inputGroup) inputGroup.style.display = 'none';
+    if (titleEl) titleEl.textContent = title || 'Confirm Action';
+    if (messageEl) messageEl.textContent = message;
+    if (proceedBtn) {
+      proceedBtn.innerHTML = `<i class="fa-solid ${isDanger ? 'fa-trash-can' : 'fa-check'}"></i> ${proceedText}`;
+      proceedBtn.className = isDanger ? 'btn btn-danger btn-sm' : 'btn btn-primary btn-sm';
+    }
+
+    let resolved = false;
+    const cleanup = () => {
+      if (proceedBtn) proceedBtn.removeEventListener('click', onProceed);
+      if (cancelBtn) cancelBtn.removeEventListener('click', onCancel);
+      closeModal('modal-confirm');
+    };
+
+    const onProceed = () => {
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+      resolve(true);
+    };
+
+    const onCancel = () => {
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+      resolve(false);
+    };
+
+    if (proceedBtn) proceedBtn.addEventListener('click', onProceed);
+    if (cancelBtn) cancelBtn.addEventListener('click', onCancel);
+
+    openModal('modal-confirm');
+  });
+}
+
+function showPromptDialog(title, message, defaultValue = '', placeholder = '') {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('modal-confirm');
+    const titleEl = document.getElementById('confirm-modal-title');
+    const messageEl = document.getElementById('confirm-modal-message');
+    const proceedBtn = document.getElementById('btn-confirm-proceed') || document.getElementById('btn-confirm-ok');
+    const cancelBtn = document.getElementById('btn-confirm-cancel');
+    const inputGroup = document.getElementById('confirm-modal-input-group');
+    const input = document.getElementById('confirm-modal-input');
+
+    if (!modal || !inputGroup || !input) {
+      resolve(window.prompt(message, defaultValue));
+      return;
+    }
+
+    inputGroup.style.display = 'block';
+    input.value = defaultValue || '';
+    input.placeholder = placeholder || 'Enter value...';
+
+    if (titleEl) titleEl.textContent = title || 'Input Required';
+    if (messageEl) messageEl.textContent = message;
+    if (proceedBtn) {
+      proceedBtn.innerHTML = '<i class="fa-solid fa-check"></i> Continue';
+      proceedBtn.className = 'btn btn-primary btn-sm';
+    }
+
+    let resolved = false;
+    const cleanup = () => {
+      if (proceedBtn) proceedBtn.removeEventListener('click', onProceed);
+      if (cancelBtn) cancelBtn.removeEventListener('click', onCancel);
+      input.removeEventListener('keydown', onKeyDown);
+      inputGroup.style.display = 'none';
+      closeModal('modal-confirm');
+    };
+
+    const onProceed = () => {
+      if (resolved) return;
+      resolved = true;
+      const val = input.value.trim();
+      cleanup();
+      resolve(val);
+    };
+
+    const onCancel = () => {
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+      resolve(null);
+    };
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        onProceed();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        onCancel();
+      }
+    };
+
+    if (proceedBtn) proceedBtn.addEventListener('click', onProceed);
+    if (cancelBtn) cancelBtn.addEventListener('click', onCancel);
+    input.addEventListener('keydown', onKeyDown);
+
+    openModal('modal-confirm');
+    setTimeout(() => {
+      input.focus();
+      input.select();
+    }, 50);
+  });
+}
+
+function initCompoundModals() {
+  const promptToggle = document.getElementById('btn-toggle-prompt-advanced');
+  const promptAdvanced = document.getElementById('prompt-advanced-options');
+  if (promptToggle && promptAdvanced) {
+    promptToggle.addEventListener('click', () => {
+      const isHidden = promptAdvanced.style.display === 'none';
+      promptAdvanced.style.display = isHidden ? 'block' : 'none';
+      promptToggle.classList.toggle('expanded', isHidden);
+    });
+  }
+
+  const charToggle = document.getElementById('btn-toggle-character-advanced');
+  const charAdvanced = document.getElementById('character-advanced-options');
+  if (charToggle && charAdvanced) {
+    charToggle.addEventListener('click', () => {
+      const isHidden = charAdvanced.style.display === 'none';
+      charAdvanced.style.display = isHidden ? 'block' : 'none';
+      charToggle.classList.toggle('expanded', isHidden);
+    });
+  }
+}
+
+// ===================================================
+// PHASE 10: DEDICATED PROJECT HUB CONTROLLER
+// ===================================================
+
+let projectActivityData = [];
+
+function initProjectHubView() {
+  const statusPill = document.getElementById('hub-project-status');
+  if (statusPill) {
+    statusPill.addEventListener('click', cycleProjectStatus);
+  }
+
+  const folderChip = document.getElementById('hub-folder-chip');
+  if (folderChip) {
+    folderChip.addEventListener('click', () => {
+      if (state.activeProjectId) openProjectFolder(state.activeProjectId);
+    });
+  }
+
+  const btnCopyPath = document.getElementById('btn-hub-copy-path');
+  if (btnCopyPath) {
+    btnCopyPath.addEventListener('click', () => {
+      const folderEl = document.getElementById('hub-project-path');
+      const text = folderEl ? folderEl.textContent : '';
+      if (text && navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast('Folder path copied to clipboard!');
+        }).catch(() => {
+          showToast('Failed to copy to clipboard', 'error');
+        });
+      }
+    });
+  }
+
+  const btnRevealFolder = document.getElementById('btn-hub-reveal-folder');
+  if (btnRevealFolder) {
+    btnRevealFolder.addEventListener('click', () => {
+      if (state.activeProjectId) openProjectFolder(state.activeProjectId);
+    });
+  }
+
+  const btnFolder = document.getElementById('btn-hub-open-folder');
+  if (btnFolder) {
+    btnFolder.addEventListener('click', () => {
+      if (state.activeProjectId) openProjectFolder(state.activeProjectId);
+    });
+  }
+
+  const btnReload = document.getElementById('btn-hub-reload-json');
+  if (btnReload) {
+    btnReload.addEventListener('click', () => {
+      if (state.activeProjectId) reloadProjectJson(state.activeProjectId);
+    });
+  }
+
+  const btnEdit = document.getElementById('btn-hub-edit-project');
+  if (btnEdit) {
+    btnEdit.addEventListener('click', () => {
+      if (state.activeProject) openProjectModal(state.activeProject);
+    });
+  }
+
+  const btnExport = document.getElementById('btn-hub-export-zip');
+  if (btnExport) {
+    btnExport.addEventListener('click', () => {
+      if (state.activeProjectId) window.open(`/api/projects/${state.activeProjectId}/export`, '_blank');
+    });
+  }
+
+  const btnAi = document.getElementById('btn-hub-open-ai');
+  if (btnAi) {
+    btnAi.addEventListener('click', () => {
+      openAiChatDrawer();
+    });
+  }
+
+  // 5 Category Directive Cards Navigation
+  document.querySelectorAll('.hub-directive-card').forEach((card) => {
+    card.addEventListener('click', () => {
+      const target = card.dataset.goto;
+      if (target) switchView(target);
+    });
+  });
+
+  const sortSelect = document.getElementById('hub-activity-sort');
+  if (sortSelect) {
+    sortSelect.addEventListener('change', () => {
+      renderProjectActivityTimeline();
+    });
+  }
+}
+
+async function renderProjectHub() {
+  if (!state.activeProject && state.projects.length > 0) {
+    state.activeProject = state.projects.find((p) => p.id === state.activeProjectId) || state.projects[0];
+  }
+  const p = state.activeProject;
+  if (!p) return;
+
+  const nameEl = document.getElementById('hub-project-name');
+  if (nameEl) nameEl.textContent = p.name;
+
+  const statusEl = document.getElementById('hub-project-status');
+  if (statusEl) {
+    statusEl.textContent = p.status || 'Draft';
+    statusEl.className = `badge hub-status-pill ${getStatusBadgeClass(p.status)}`;
+    statusEl.title = 'Click to cycle status: Draft -> In Progress -> Ready -> Done';
+  }
+
+  const dotEl = document.getElementById('hub-project-dot');
+  if (dotEl) {
+    const statusColor = p.status === 'Done' || p.status === 'Completed' ? '#10b981' : (p.status === 'Ready' ? '#38bdf8' : (p.status === 'In Progress' ? '#f59e0b' : '#64748b'));
+    dotEl.style.backgroundColor = statusColor;
+  }
+
+  const descEl = document.getElementById('hub-project-desc');
+  if (descEl) descEl.textContent = p.description || 'No description provided for this project.';
+
+  const folderEl = document.getElementById('hub-project-path') || document.getElementById('hub-folder-name');
+  if (folderEl) folderEl.textContent = p.folder_path || `data/projects/${p.id}/`;
+
+  // Progress Bar
+  const progressText = document.getElementById('hub-progress-text');
+  const progressFill = document.getElementById('hub-progress-fill');
+  const percent = p.progress_percent || 0;
+  if (progressText) {
+    progressText.textContent = `${percent}% Complete (${p.completed_parts_count || 0}/${p.parts_count || 0} Scenes Done)`;
+  }
+  if (progressFill) progressFill.style.width = `${percent}%`;
+
+  // Directive Counts
+  const countParts = document.getElementById('hub-count-parts');
+  if (countParts) countParts.textContent = state.parts.length;
+  const countPrompts = document.getElementById('hub-count-prompts');
+  if (countPrompts) countPrompts.textContent = state.prompts.length;
+  const countChars = document.getElementById('hub-count-characters');
+  if (countChars) countChars.textContent = state.characters.length;
+  const countLinks = document.getElementById('hub-count-links');
+  if (countLinks) countLinks.textContent = state.links.length;
+  const countBoards = document.getElementById('hub-count-boards');
+  if (countBoards) countBoards.textContent = state.boards.length;
+
+  // Load Activity Timeline
+  loadProjectActivity();
+}
+
+async function cycleProjectStatus() {
+  if (!state.activeProject) return;
+  const cycle = ['Draft', 'In Progress', 'Ready', 'Done'];
+  const current = state.activeProject.status || 'Draft';
+  const idx = cycle.indexOf(current);
+  const nextStatus = cycle[(idx + 1) % cycle.length];
+
+  try {
+    const res = await fetch(`/api/projects/${state.activeProject.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: state.activeProject.name,
+        description: state.activeProject.description,
+        status: nextStatus,
+      }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const updated = await res.json();
+    state.activeProject = updated;
+    const pIdx = state.projects.findIndex((p) => p.id === updated.id);
+    if (pIdx !== -1) state.projects[pIdx] = updated;
+
+    updateProjectSwitcherUI();
+    renderProjectHub();
+    showToast(`Project status changed to "${nextStatus}"`);
+  } catch (err) {
+    console.error('Failed to cycle status', err);
+    showToast(`Failed: ${err.message}`, 'error');
+  }
+}
+
+async function loadProjectActivity() {
+  if (!state.activeProjectId) return;
+  const listEl = document.getElementById('hub-activity-list');
+  if (listEl) listEl.innerHTML = '<div class="activity-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading recent activity...</div>';
+
+  try {
+    const res = await fetch(`/api/projects/${state.activeProjectId}/activity`);
+    if (!res.ok) throw new Error(await res.text());
+    projectActivityData = await res.json();
+    renderProjectActivityTimeline();
+  } catch (err) {
+    console.error('Failed to load project activity', err);
+    if (listEl) listEl.innerHTML = '<div class="activity-empty">No activity items recorded yet.</div>';
+  }
+}
+
+function renderProjectActivityTimeline() {
+  const listEl = document.getElementById('hub-activity-list');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+
+  if (!projectActivityData || projectActivityData.length === 0) {
+    listEl.innerHTML = '<div class="activity-empty"><i class="fa-solid fa-clock-rotate-left"></i> No recorded activity for this project yet. Create parts, prompts, or characters to see updates here.</div>';
+    return;
+  }
+
+  const sortBy = document.getElementById('hub-activity-sort')?.value || 'recent';
+  let sorted = [...projectActivityData];
+  if (sortBy === 'type') {
+    sorted.sort((a, b) => a.entity_type.localeCompare(b.entity_type));
+  } else if (sortBy === 'title') {
+    sorted.sort((a, b) => a.title.localeCompare(b.title));
+  } else {
+    sorted.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  }
+
+  sorted.forEach((item) => {
+    const row = document.createElement('div');
+    row.className = 'activity-item';
+
+    let iconClass = 'fa-cube';
+    if (item.entity_type === 'part') iconClass = 'fa-film';
+    else if (item.entity_type === 'prompt') iconClass = 'fa-feather-pointed';
+    else if (item.entity_type === 'character') iconClass = 'fa-users';
+    else if (item.entity_type === 'link') iconClass = 'fa-link';
+    else if (item.entity_type === 'board') iconClass = 'fa-chalkboard';
+    else if (item.entity_type === 'attachment') iconClass = 'fa-file';
+    else if (item.entity_type === 'project') iconClass = 'fa-folder-open';
+
+    const iconEl = document.createElement('div');
+    iconEl.className = 'activity-icon';
+    iconEl.innerHTML = `<i class="fa-solid ${iconClass}"></i>`;
+    row.appendChild(iconEl);
+
+    const details = document.createElement('div');
+    details.className = 'activity-details';
+
+    const titleWrap = document.createElement('div');
+    const titleEl = document.createElement('span');
+    titleEl.className = 'activity-entity-title';
+    titleEl.textContent = item.title;
+    titleWrap.appendChild(titleEl);
+
+    const typeSpan = document.createElement('span');
+    typeSpan.className = 'badge badge-sm';
+    typeSpan.style.marginLeft = '0.5rem';
+    typeSpan.textContent = item.entity_type;
+    titleWrap.appendChild(typeSpan);
+    details.appendChild(titleWrap);
+
+    const metaWrap = document.createElement('div');
+    metaWrap.style.display = 'flex';
+    metaWrap.style.alignItems = 'center';
+    metaWrap.style.gap = '0.5rem';
+
+    const tag = document.createElement('span');
+    const act = (item.action || 'updated').toLowerCase();
+    tag.className = `activity-action-tag activity-action-${act}`;
+    tag.textContent = act;
+    metaWrap.appendChild(tag);
+
+    const time = document.createElement('span');
+    time.className = 'activity-timestamp';
+    time.textContent = item.timestamp ? (item.timestamp.split('T')[0] + ' ' + (item.timestamp.split('T')[1] || '').substring(0, 5)) : '';
+    metaWrap.appendChild(time);
+
+    details.appendChild(metaWrap);
+    row.appendChild(details);
+    listEl.appendChild(row);
+  });
+}
+
+// ===================================================
+// PHASE 10: ADVANCED SETTINGS & AMBIENT ANIMATION
+// ===================================================
+
+async function loadSettingsUI() {
+  try {
+    const res = await fetch('/api/settings');
+    let settings = {};
+    if (res.ok) {
+      settings = await res.json();
+    }
+
+    // AI Settings
+    const providerSelect = document.getElementById('setting-ai-provider');
+    if (providerSelect) providerSelect.value = settings.ai_provider || localStorage.getItem('atelier_ai_provider') || 'openrouter';
+
+    const keyInput = document.getElementById('setting-ai-key');
+    if (keyInput) keyInput.value = settings.ai_api_key || localStorage.getItem('atelier_ai_key') || '';
+
+    const modelInput = document.getElementById('setting-ai-model');
+    if (modelInput) modelInput.value = settings.ai_model || localStorage.getItem('atelier_ai_model') || 'anthropic/claude-3.5-sonnet';
+
+    const baseUrlInput = document.getElementById('setting-ai-base-url');
+    if (baseUrlInput) baseUrlInput.value = settings.ai_base_url || localStorage.getItem('atelier_ai_base_url') || '';
+
+    // Layout Mode
+    const layoutMode = settings.layout_mode || localStorage.getItem('atelier_layout_mode') || 'sidebar';
+    applyLayoutMode(layoutMode, false);
+
+    // Chamfered Edges
+    const chamfered = settings.chamfered_edges === 'true' || localStorage.getItem('atelier_chamfered') === 'true';
+    applyChamferedMode(chamfered, false);
+
+    // Ambient Background
+    const ambientActive = settings.ambient_active === 'true' || localStorage.getItem('atelier_ambient_active') === 'true';
+    const ambientColor = settings.ambient_color || localStorage.getItem('atelier_ambient_color') || '#dc2626';
+    const ambientSpeed = settings.ambient_speed || localStorage.getItem('atelier_ambient_speed') || '8s';
+    const ambientIntensity = settings.ambient_intensity || localStorage.getItem('atelier_ambient_intensity') || '0.15';
+    applyAmbientSettings(ambientActive, ambientColor, ambientSpeed, ambientIntensity, false);
+
+    // Theme Selector Grid sync
+    const currentTheme = localStorage.getItem('atelier_theme') || 'dark';
+    document.querySelectorAll('.theme-card-option').forEach((opt) => {
+      opt.classList.toggle('active', opt.dataset.theme === currentTheme);
+    });
+
+    updateAiDrawerProviderBadge();
+  } catch (err) {
+    console.error('Failed to load settings', err);
+  }
+}
+
+function initSettingsView() {
+  const providerSelect = document.getElementById('setting-ai-provider');
+  const modelInput = document.getElementById('setting-ai-model');
+  const baseUrlInput = document.getElementById('setting-ai-base-url');
+
+  if (providerSelect) {
+    providerSelect.addEventListener('change', () => {
+      const p = providerSelect.value;
+      if (p === 'openrouter') {
+        if (modelInput) modelInput.placeholder = 'anthropic/claude-3.5-sonnet';
+        if (baseUrlInput) baseUrlInput.placeholder = 'https://openrouter.ai/api/v1';
+      } else if (p === 'openai') {
+        if (modelInput) modelInput.placeholder = 'gpt-4o';
+        if (baseUrlInput) baseUrlInput.placeholder = 'https://api.openai.com/v1';
+      } else if (p === 'anthropic') {
+        if (modelInput) modelInput.placeholder = 'claude-3-5-sonnet-20241022';
+        if (baseUrlInput) baseUrlInput.placeholder = 'https://api.anthropic.com/v1';
+      } else if (p === 'gemini') {
+        if (modelInput) modelInput.placeholder = 'gemini-1.5-flash';
+        if (baseUrlInput) baseUrlInput.placeholder = 'https://generativelanguage.googleapis.com/v1beta';
+      } else if (p === 'groq') {
+        if (modelInput) modelInput.placeholder = 'llama-3.3-70b-versatile';
+        if (baseUrlInput) baseUrlInput.placeholder = 'https://api.groq.com/openai/v1';
+      } else if (p === 'ollama') {
+        if (modelInput) modelInput.placeholder = 'llama3.2';
+        if (baseUrlInput) baseUrlInput.placeholder = 'http://localhost:11434';
+      }
+    });
+  }
+
+  // Toggle Key Visibility
+  const toggleKeyBtn = document.getElementById('btn-toggle-ai-key');
+  const iconToggleKey = document.getElementById('icon-toggle-ai-key');
+  const keyInput = document.getElementById('setting-ai-key');
+  if (toggleKeyBtn && keyInput && iconToggleKey) {
+    toggleKeyBtn.addEventListener('click', () => {
+      const isPassword = keyInput.type === 'password';
+      keyInput.type = isPassword ? 'text' : 'password';
+      iconToggleKey.className = isPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+    });
+  }
+
+  // Save AI Settings Form
+  const aiForm = document.getElementById('form-ai-settings');
+  if (aiForm) {
+    aiForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const provider = providerSelect?.value || 'openrouter';
+      const key = keyInput?.value.trim() || '';
+      const model = modelInput?.value.trim() || '';
+      const baseUrl = baseUrlInput?.value.trim() || '';
+
+      localStorage.setItem('atelier_ai_provider', provider);
+      localStorage.setItem('atelier_ai_key', key);
+      localStorage.setItem('atelier_ai_model', model);
+      localStorage.setItem('atelier_ai_base_url', baseUrl);
+
+      try {
+        await fetch('/api/settings/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            settings: {
+              ai_provider: provider,
+              ai_api_key: key,
+              ai_model: model,
+              ai_base_url: baseUrl,
+            },
+          }),
+        });
+        showToast('AI Settings saved to local database');
+        updateAiDrawerProviderBadge();
+      } catch (err) {
+        console.error('Failed to save settings', err);
+        showToast('AI Settings saved locally');
+      }
+    });
+  }
+
+  // Test Connection
+  const testBtn = document.getElementById('btn-test-ai-connection');
+  const testStatus = document.getElementById('ai-test-status');
+  if (testBtn) {
+    testBtn.addEventListener('click', async () => {
+      if (!testStatus) return;
+      testStatus.style.display = 'inline-flex';
+      testStatus.className = 'connection-status-pill';
+      testStatus.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Testing connection...';
+
+      const provider = providerSelect?.value || 'openrouter';
+      const key = keyInput?.value.trim() || '';
+      const model = modelInput?.value.trim() || '';
+      const baseUrl = baseUrlInput?.value.trim() || '';
+
+      try {
+        const res = await fetch('/api/ai/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            provider,
+            api_key: key,
+            model,
+            base_url: baseUrl,
+            test_connection: true,
+            messages: [{ role: 'user', content: 'Ping. Reply with "pong".' }],
+          }),
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        testStatus.className = 'connection-status-pill success';
+        testStatus.innerHTML = `<i class="fa-solid fa-circle-check"></i> Connected (${provider}): ${data.model || 'OK'}`;
+      } catch (err) {
+        testStatus.className = 'connection-status-pill error';
+        testStatus.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Error: ${err.message}`;
+      }
+    });
+  }
+
+  // Layout Mode Buttons
+  const btnSidebar = document.getElementById('btn-layout-sidebar');
+  const btnDock = document.getElementById('btn-layout-dock');
+  if (btnSidebar && btnDock) {
+    btnSidebar.addEventListener('click', () => applyLayoutMode('sidebar', true));
+    btnDock.addEventListener('click', () => applyLayoutMode('dock', true));
+  }
+
+  // Chamfered Edges Toggle
+  const chamferCheckbox = document.getElementById('setting-chamfered-edges');
+  if (chamferCheckbox) {
+    chamferCheckbox.addEventListener('change', (e) => {
+      applyChamferedMode(e.target.checked, true);
+    });
+  }
+
+  // Ambient Animation Controls
+  const ambientCheckbox = document.getElementById('setting-ambient-active');
+  const ambientCustomHex = document.getElementById('setting-ambient-custom-hex');
+  const ambientSpeed = document.getElementById('setting-ambient-speed');
+  const ambientIntensity = document.getElementById('setting-ambient-intensity');
+  const ambientIntensityVal = document.getElementById('ambient-intensity-val');
+
+  if (ambientCheckbox) {
+    ambientCheckbox.addEventListener('change', (e) => {
+      applyAmbientSettings(e.target.checked, ambientCustomHex?.value, ambientSpeed?.value, ambientIntensity?.value, true);
+    });
+  }
+
+  document.querySelectorAll('.ambient-preset-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.ambient-preset-btn').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      const color = btn.dataset.color;
+      if (ambientCustomHex) ambientCustomHex.value = color;
+      applyAmbientSettings(ambientCheckbox?.checked, color, ambientSpeed?.value, ambientIntensity?.value, true);
+    });
+  });
+
+  if (ambientCustomHex) {
+    ambientCustomHex.addEventListener('input', (e) => {
+      applyAmbientSettings(ambientCheckbox?.checked, e.target.value, ambientSpeed?.value, ambientIntensity?.value, true);
+    });
+  }
+
+  if (ambientSpeed) {
+    ambientSpeed.addEventListener('change', (e) => {
+      applyAmbientSettings(ambientCheckbox?.checked, ambientCustomHex?.value, e.target.value, ambientIntensity?.value, true);
+    });
+  }
+
+  if (ambientIntensity) {
+    ambientIntensity.addEventListener('input', (e) => {
+      const val = e.target.value;
+      if (ambientIntensityVal) ambientIntensityVal.textContent = `${Math.round(val * 100)}%`;
+      applyAmbientSettings(ambientCheckbox?.checked, ambientCustomHex?.value, ambientSpeed?.value, val, true);
+    });
+  }
+
+  // Themes Grid Option Click
+  document.querySelectorAll('.theme-card-option').forEach((card) => {
+    card.addEventListener('click', () => {
+      const theme = card.dataset.theme;
+      applyTheme(theme, true);
+      document.querySelectorAll('.theme-card-option').forEach((c) => c.classList.toggle('active', c.dataset.theme === theme));
+    });
+  });
+}
+
+function applyLayoutMode(mode, save = false) {
+  const isDock = mode === 'dock';
+  document.body.classList.toggle('layout-dock-mode', isDock);
+  document.getElementById('btn-layout-sidebar')?.classList.toggle('active', !isDock);
+  document.getElementById('btn-layout-dock')?.classList.toggle('active', isDock);
+
+  if (save) {
+    localStorage.setItem('atelier_layout_mode', mode);
+    fetch('/api/settings/layout_mode', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: mode }),
+    }).catch(() => {});
+    showToast(isDock ? 'Switched to Bottom Floating Dock layout' : 'Switched to Classic Sidebar layout');
+  }
+}
+
+function applyChamferedMode(enabled, save = false) {
+  document.body.classList.toggle('chamfered-mode', enabled);
+  const cb = document.getElementById('setting-chamfered-edges');
+  if (cb) cb.checked = enabled;
+
+  if (save) {
+    localStorage.setItem('atelier_chamfered', enabled ? 'true' : 'false');
+    fetch('/api/settings/chamfered_edges', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: enabled ? 'true' : 'false' }),
+    }).catch(() => {});
+    showToast(enabled ? 'Cyberpunk Chamfered Edges enabled' : 'Chamfered Edges disabled');
+  }
+}
+
+function applyAmbientSettings(active, color, speed, intensity, save = false) {
+  const c = color || '#dc2626';
+  const s = speed || '8s';
+  const i = parseFloat(intensity) || 0.15;
+
+  document.body.classList.toggle('ambient-active', !!active);
+  document.documentElement.style.setProperty('--ambient-color', c);
+  document.documentElement.style.setProperty('--ambient-speed', s);
+  document.documentElement.style.setProperty('--ambient-intensity-high', `${i}`);
+  document.documentElement.style.setProperty('--ambient-intensity-low', `${(i * 0.25).toFixed(3)}`);
+
+  const cb = document.getElementById('setting-ambient-active');
+  if (cb) cb.checked = !!active;
+
+  const hex = document.getElementById('setting-ambient-custom-hex');
+  if (hex) hex.value = c;
+
+  const sp = document.getElementById('setting-ambient-speed');
+  if (sp) sp.value = s;
+
+  const it = document.getElementById('setting-ambient-intensity');
+  if (it) it.value = i;
+
+  const itVal = document.getElementById('ambient-intensity-val');
+  if (itVal) itVal.textContent = `${Math.round(i * 100)}%`;
+
+  if (save) {
+    localStorage.setItem('atelier_ambient_active', active ? 'true' : 'false');
+    localStorage.setItem('atelier_ambient_color', c);
+    localStorage.setItem('atelier_ambient_speed', s);
+    localStorage.setItem('atelier_ambient_intensity', `${i}`);
+
+    fetch('/api/settings/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        settings: {
+          ambient_active: active ? 'true' : 'false',
+          ambient_color: c,
+          ambient_speed: s,
+          ambient_intensity: `${i}`,
+        },
+      }),
+    }).catch(() => {});
+  }
+}
+
+// ===================================================
+// PHASE 10: BOTTOM DOCK & AI ASSISTANT DRAWER
+// ===================================================
+
+function initBottomDock() {
+  document.querySelectorAll('#bottom-dock .dock-btn[data-view]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const view = btn.dataset.view;
+      switchView(view);
+    });
+  });
+
+  const btnAi = document.getElementById('dock-btn-ai');
+  if (btnAi) btnAi.addEventListener('click', openAiChatDrawer);
+
+  const expandToggle = document.getElementById('btn-dock-expand');
+  const expandDrawer = document.getElementById('dock-expand-drawer');
+  const chevron = document.getElementById('dock-expand-chevron');
+  const closeDrawerBtn = document.getElementById('btn-close-dock-drawer');
+
+  if (expandToggle && expandDrawer) {
+    expandToggle.addEventListener('click', () => {
+      const isOpen = expandDrawer.classList.toggle('open');
+      if (chevron) chevron.className = isOpen ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-up';
+      if (isOpen) updateDockDrawerContent();
+    });
+  }
+
+  if (closeDrawerBtn && expandDrawer) {
+    closeDrawerBtn.addEventListener('click', () => {
+      expandDrawer.classList.remove('open');
+      if (chevron) chevron.className = 'fa-solid fa-chevron-up';
+    });
+  }
+
+  document.getElementById('dock-btn-open-hub')?.addEventListener('click', () => {
+    expandDrawer?.classList.remove('open');
+    switchView('project-hub');
+  });
+
+  document.getElementById('dock-btn-quick-new-part')?.addEventListener('click', () => {
+    expandDrawer?.classList.remove('open');
+    openPartModal();
+  });
+
+  document.getElementById('dock-btn-quick-new-prompt')?.addEventListener('click', () => {
+    expandDrawer?.classList.remove('open');
+    openPromptModal();
+  });
+
+  document.getElementById('dock-btn-quick-open-folder')?.addEventListener('click', () => {
+    if (state.activeProjectId) openProjectFolder(state.activeProjectId);
+  });
+}
+
+function updateDockDrawerContent() {
+  const p = state.activeProject;
+  if (!p) return;
+
+  const nameEl = document.getElementById('dock-drawer-project-name');
+  if (nameEl) nameEl.textContent = p.name;
+
+  const statusEl = document.getElementById('dock-drawer-project-status');
+  if (statusEl) {
+    statusEl.textContent = p.status || 'Draft';
+    statusEl.className = `badge badge-sm ${getStatusBadgeClass(p.status)}`;
+  }
+
+  const chipPa = document.getElementById('dock-chip-parts');
+  if (chipPa) chipPa.innerHTML = `<i class="fa-solid fa-film"></i> ${state.parts.length} Parts`;
+
+  const chipPr = document.getElementById('dock-chip-prompts');
+  if (chipPr) chipPr.innerHTML = `<i class="fa-solid fa-feather-pointed"></i> ${state.prompts.length} Prompts`;
+
+  const chipCh = document.getElementById('dock-chip-characters');
+  if (chipCh) chipCh.innerHTML = `<i class="fa-solid fa-users"></i> ${state.characters.length} Cast`;
+
+  const chipLi = document.getElementById('dock-chip-links');
+  if (chipLi) chipLi.innerHTML = `<i class="fa-solid fa-link"></i> ${state.links.length} Refs`;
+
+  const chipBo = document.getElementById('dock-chip-boards');
+  if (chipBo) chipBo.innerHTML = `<i class="fa-solid fa-chalkboard"></i> ${state.boards.length} Boards`;
+}
+
+function initAiChatDrawer() {
+  const drawer = document.getElementById('ai-chat-drawer');
+  const closeBtn = document.getElementById('btn-close-ai-drawer');
+  const clearBtn = document.getElementById('btn-clear-ai-chat');
+  const form = document.getElementById('ai-chat-form');
+  const input = document.getElementById('ai-chat-input');
+  const navAiTrigger = document.getElementById('nav-ai-assistant-trigger');
+  const btnSidebarAi = document.getElementById('btn-sidebar-ai');
+
+  if (navAiTrigger) {
+    navAiTrigger.addEventListener('click', openAiChatDrawer);
+  }
+  if (btnSidebarAi) {
+    btnSidebarAi.addEventListener('click', openAiChatDrawer);
+  }
+
+  if (closeBtn && drawer) {
+    closeBtn.addEventListener('click', closeAiChatDrawer);
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      const msgs = document.getElementById('ai-chat-messages');
+      if (msgs) {
+        msgs.innerHTML = `
+          <div class="ai-message assistant intro">
+            <div class="ai-message-bubble">
+              <p><strong>Conversation cleared.</strong> What shall we brainstorm or create next for <em>${state.activeProject ? state.activeProject.name : 'this project'}</em>?</p>
+              <div class="ai-quick-suggestions">
+                <button type="button" class="ai-suggestion-chip" data-prompt="Brainstorm 3 unique scene ideas for this project"><i class="fa-solid fa-film"></i> 3 Scene Ideas</button>
+                <button type="button" class="ai-suggestion-chip" data-prompt="Generate a compelling character persona with visual traits and lore"><i class="fa-solid fa-users"></i> Character Persona</button>
+                <button type="button" class="ai-suggestion-chip" data-prompt="Write a detailed cinematic Midjourney v6 lighting prompt"><i class="fa-solid fa-feather-pointed"></i> Cinematic Prompt</button>
+              </div>
+            </div>
+          </div>
+        `;
+        wireAiQuickSuggestions();
+      }
+    });
+  }
+
+  wireAiQuickSuggestions();
+
+  if (input) {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        form?.dispatchEvent(new Event('submit'));
+      }
+    });
+  }
+
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = '';
+
+      appendAiMessage('user', text);
+      await sendAiChat(text);
+    });
+  }
+}
+
+function wireAiQuickSuggestions() {
+  document.querySelectorAll('.ai-suggestion-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const p = chip.dataset.prompt;
+      if (p) {
+        appendAiMessage('user', p);
+        sendAiChat(p);
+      }
+    });
+  });
+}
+
+function openAiChatDrawer() {
+  const drawer = document.getElementById('ai-chat-drawer');
+  if (drawer) {
+    drawer.classList.add('open');
+    updateAiDrawerProjectContext();
+    updateAiDrawerProviderBadge();
+    document.getElementById('ai-chat-input')?.focus();
+  }
+}
+
+function closeAiChatDrawer() {
+  document.getElementById('ai-chat-drawer')?.classList.remove('open');
+}
+
+function updateAiDrawerProjectContext() {
+  const nameEl = document.getElementById('ai-context-project-name');
+  if (nameEl) nameEl.textContent = state.activeProject ? state.activeProject.name : 'No Active Project';
+}
+
+function updateAiDrawerProviderBadge() {
+  const badge = document.getElementById('ai-provider-badge');
+  if (badge) {
+    const provider = localStorage.getItem('atelier_ai_provider') || 'openrouter';
+    badge.textContent = provider.charAt(0).toUpperCase() + provider.slice(1);
+  }
+}
+
+function appendAiMessage(role, content, actions = false) {
+  const container = document.getElementById('ai-chat-messages');
+  if (!container) return;
+
+  const msg = document.createElement('div');
+  msg.className = `ai-message ${role}`;
+
+  const bubble = document.createElement('div');
+  bubble.className = 'ai-message-bubble';
+
+  if (role === 'assistant') {
+    const escaped = content
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\n/g, '<br>');
+    bubble.innerHTML = `<p>${escaped}</p>`;
+
+    if (actions) {
+      const actionRow = document.createElement('div');
+      actionRow.className = 'ai-message-actions';
+
+      const btnSavePrompt = document.createElement('button');
+      btnSavePrompt.type = 'button';
+      btnSavePrompt.className = 'ai-action-btn';
+      btnSavePrompt.innerHTML = '<i class="fa-solid fa-feather-pointed"></i> Save as Prompt';
+      btnSavePrompt.addEventListener('click', () => {
+        openPromptModal({
+          title: 'AI Generated Prompt',
+          body: content,
+        });
+      });
+      actionRow.appendChild(btnSavePrompt);
+
+      const btnSaveChar = document.createElement('button');
+      btnSaveChar.type = 'button';
+      btnSaveChar.className = 'ai-action-btn';
+      btnSaveChar.innerHTML = '<i class="fa-solid fa-users"></i> Save as Character';
+      btnSaveChar.addEventListener('click', () => {
+        openCharacterModal({
+          name: 'AI Character',
+          description: content.substring(0, 200),
+          traits: content,
+        });
+      });
+      actionRow.appendChild(btnSaveChar);
+
+      const btnSavePart = document.createElement('button');
+      btnSavePart.type = 'button';
+      btnSavePart.className = 'ai-action-btn';
+      btnSavePart.innerHTML = '<i class="fa-solid fa-film"></i> Add Scene Part';
+      btnSavePart.addEventListener('click', () => {
+        openPartModal({
+          title: 'AI Draft Scene',
+          notes: content,
+          part_type: 'scene',
+        });
+      });
+      actionRow.appendChild(btnSavePart);
+
+      bubble.appendChild(actionRow);
+    }
+  } else {
+    bubble.textContent = content;
+  }
+
+  msg.appendChild(bubble);
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
+}
+
+async function sendAiChat(userText) {
+  const container = document.getElementById('ai-chat-messages');
+  const typingMsg = document.createElement('div');
+  typingMsg.className = 'ai-message assistant';
+  typingMsg.id = 'ai-typing-indicator';
+  typingMsg.innerHTML = '<div class="ai-message-bubble"><i class="fa-solid fa-spinner fa-spin"></i> Thinking...</div>';
+  container.appendChild(typingMsg);
+  container.scrollTop = container.scrollHeight;
+
+  const provider = localStorage.getItem('atelier_ai_provider') || 'openrouter';
+  const apiKey = localStorage.getItem('atelier_ai_key') || '';
+  const model = localStorage.getItem('atelier_ai_model') || '';
+  const baseUrl = localStorage.getItem('atelier_ai_base_url') || '';
+
+  const projectContext = state.activeProject
+    ? `Active Project: "${state.activeProject.name}" (Status: ${state.activeProject.status}, Description: ${state.activeProject.description || 'None'}).`
+    : '';
+
+  const messages = [
+    {
+      role: 'system',
+      content: `You are Atelier AI, a creative studio assistant for social media management, cinematic production, prompts, and visual character lore. ${projectContext} Keep responses focused, structured, and actionable.`,
+    },
+    {
+      role: 'user',
+      content: userText,
+    },
+  ];
+
+  try {
+    const res = await fetch('/api/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        provider,
+        api_key: apiKey,
+        model,
+        base_url: baseUrl,
+        messages,
+      }),
+    });
+
+    typingMsg.remove();
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText);
+    }
+
+    const data = await res.json();
+    appendAiMessage('assistant', data.content, true);
+  } catch (err) {
+    typingMsg.remove();
+    appendAiMessage('assistant', `Failed to generate AI response: ${err.message}. Check your provider settings in Settings tab.`);
+  }
+}
+

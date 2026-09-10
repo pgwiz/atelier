@@ -14,6 +14,7 @@ use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 
 use handlers::{
+    ai::ai_chat,
     attachments::{
         delete_attachment, get_attachment, list_attachments, stream_project_file,
         upload_attachment,
@@ -34,14 +35,15 @@ use handlers::{
         patch_part_status, reorder_parts, update_part,
     },
     projects::{
-        copy_project, create_project, delete_project, export_project_package, get_project,
-        import_project_package, list_projects, merge_projects, reload_project_json,
-        transfer_items, update_project,
+        copy_project, create_project, delete_project, export_project_package,
+        get_project, get_project_activity, import_project_package, list_projects,
+        merge_projects, reload_project_json, transfer_items, update_project,
     },
     prompts::{
         create_prompt, delete_prompt, get_prompt, list_prompts, toggle_favorite, update_prompt,
     },
     search::search_handler,
+    settings::{bulk_set_settings, get_all_settings, get_setting, set_setting},
     tags::{attach_tag, detach_tag, list_tags},
     upload::upload_file,
 };
@@ -59,6 +61,7 @@ pub fn create_app(state: AppState) -> Router {
             "/projects/:id",
             get(get_project).put(update_project).delete(delete_project),
         )
+        .route("/projects/:id/activity", get(get_project_activity))
         .route("/projects/:id/copy", post(copy_project))
         .route("/projects/:id/merge", post(merge_projects))
         .route("/projects/transfer", post(transfer_items))
@@ -139,7 +142,13 @@ pub fn create_app(state: AppState) -> Router {
         .route("/backup/export", get(export_json))
         .route("/backup/import", post(import_json))
         .route("/backup/archive", get(export_archive))
-        .route("/backup/restore", post(restore_archive));
+        .route("/backup/restore", post(restore_archive))
+        // Settings
+        .route("/settings", get(get_all_settings).post(bulk_set_settings))
+        .route("/settings/bulk", post(bulk_set_settings))
+        .route("/settings/:key", get(get_setting).put(set_setting))
+        // AI Assistant
+        .route("/ai/chat", post(ai_chat));
 
     let index_file = state.static_dir.join("index.html");
     let static_service = ServeDir::new(&state.static_dir).fallback(ServeFile::new(index_file));

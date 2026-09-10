@@ -35,6 +35,14 @@ Atelier is a local-only, single-user content sketchbook and visual planning canv
   - Canvas mini-parts: interactive cards on the planning canvas with clickable status badges and arrow connection anchors.
   - Custom Addons: in-app audio player with speed controls (0.75x to 2x), monospace document/script reader, PDF embed, and path-traversal-safe native OS File Explorer reveal (`explorer.exe /select,"<path>"`).
   - Multi-workspace operations: Deep Copy, Non-destructive Merge (with duplicate name suffixing), and Visual Transfer Workbench.
+- **Phase 10: Project Card Redesign, Project Hub, AI Assistant & Canvas Overhaul**:
+  - Redesigned Project Card: Replaces button clutter with a primary "Open Project" button + 3-dots actions dropdown menu (`fa-ellipsis-vertical`) with verified Font Awesome 6 icons.
+  - Dedicated Project Hub (`#view-project-hub`): Management banner, Category Directives cards (Parts, Prompts, Characters, Media, Boards), and sortable "What Changed" recent activity timeline (`/api/projects/:id/activity`).
+  - Advanced Settings & AI Assistant: Provider config (OpenRouter, OpenAI, Anthropic, Gemini, Groq, Ollama), masked API key input, and slide-out AI Assistant drawer (`#ai-chat-drawer`) with one-click Save-to-Project actions.
+  - Centered Futuristic Bottom Floating Dock (`#bottom-dock`) with arrow-up expand drawer (`#dock-expand-drawer`).
+  - Cyberpunk Chamfered Futuristic Edges (`clip-path: polygon(...)` bounded within 8px) with tech corner notches.
+  - Configurable solid-color ambient background fade animation (Crimson Red `#dc2626` preset, speed, intensity, 100% zero gradients).
+  - Canvas Overhaul: Dynamic contextual cursors (`crosshair`, `text`, `cell`, `move`, `se-resize`), seamless inline floating text editor (no browser `prompt()`), and dragging/moving for selected SVG shapes, text, and strokes.
 
 ## Key Rules & Invariants
 - **Markdown file restriction**: Exactly 4 markdown files permitted in the repository: `README.md`, `changelog.md`, `memory.md`, and `agent.md`.
@@ -52,7 +60,7 @@ Atelier is a local-only, single-user content sketchbook and visual planning canv
 - **Deep Copy & Merge Remapping**: Board items referencing parts (`entity_type == "part"`) are remapped to new part IDs during copy and merge operations.
 
 ## Verification Status
-- Integration test suite in `tests/api_tests.rs` with 24 comprehensive tests (100% passing, 0 warnings, 0 failures):
+- Integration test suite in `tests/api_tests.rs` with 27 comprehensive tests (100% passing, 0 warnings, 0 failures):
   - `test_prompts_crud_and_tags`
   - `test_characters_crud_and_linkage`
   - `test_links_and_tags`
@@ -77,3 +85,7 @@ Atelier is a local-only, single-user content sketchbook and visual planning canv
   - `test_phase9_cannot_delete_only_project`
   - `test_phase9_deep_copy_and_merge_remap_board_part_items`
   - `test_phase9_reload_json_with_new_unassigned_entities`
+  - `test_phase10_settings_crud_and_bulk`
+  - `test_phase10_project_activity_feed`
+  - `test_phase10_ai_proxy_validation`
+
