@@ -9,7 +9,10 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
-    handlers::tags::{get_tags_for_entity, set_entity_tags},
+    handlers::{
+        projects::sync_project_json,
+        tags::{get_tags_for_entity, set_entity_tags},
+    },
     main_types::{AppError, AppState},
     models::{CreatePromptDto, Prompt, UpdatePromptDto},
 };
@@ -21,6 +24,7 @@ pub struct PromptFilterParams {
     pub favorite: Option<bool>,
     pub tag: Option<String>,
     pub q: Option<String>,
+    pub project_id: Option<i64>,
 }
 
 fn row_to_prompt(conn: &Connection, row: &rusqlite::Row) -> Result<Prompt, rusqlite::Error> {
@@ -34,8 +38,10 @@ fn row_to_prompt(conn: &Connection, row: &rusqlite::Row) -> Result<Prompt, rusql
     let notes: Option<String> = row.get(7)?;
     let is_favorite_int: i64 = row.get(8)?;
     let character_id: Option<i64> = row.get(9)?;
-    let created_at: String = row.get(10)?;
-    let character_name: Option<String> = row.get(11)?;
+    let project_id: Option<i64> = row.get(10)?;
+    let created_at: String = row.get(11)?;
+    let updated_at: Option<String> = row.get(12)?;
+    let character_name: Option<String> = row.get(13)?;
 
     let tags = get_tags_for_entity(conn, "prompt", id).unwrap_or_default();
 
@@ -50,7 +56,9 @@ fn row_to_prompt(conn: &Connection, row: &rusqlite::Row) -> Result<Prompt, rusql
         notes,
         is_favorite: is_favorite_int != 0,
         character_id,
+        project_id,
         created_at,
+        updated_at,
         tags,
         character_name,
     })
@@ -65,7 +73,8 @@ pub async fn list_prompts(
 
     let mut sql = String::from(
         "SELECT p.id, p.title, p.body, p.system_prompt, p.parameters, p.model_used,
-                p.category, p.notes, p.is_favorite, p.character_id, p.created_at,
+                p.category, p.notes, p.is_favorite, p.character_id, p.project_id,
+                p.created_at, p.updated_at,
                 c.name as character_name
          FROM prompts p
          LEFT JOIN characters c ON p.character_id = c.id
@@ -73,6 +82,11 @@ pub async fn list_prompts(
     );
 
     let mut bind_params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+    if let Some(proj_id) = params.project_id {
+        sql.push_str(" AND p.project_id = ?");
+        bind_params.push(Box::new(proj_id));
+    }
 
     if let Some(cid) = params.character_id {
         sql.push_str(" AND p.character_id = ?");
@@ -121,7 +135,6 @@ pub async fn list_prompts(
 
     let prompt_iter = stmt
         .query_map(rusqlite_params.as_slice(), |row| {
-            // Read fields directly
             let id: i64 = row.get(0)?;
             let title: String = row.get(1)?;
             let body: String = row.get(2)?;
@@ -132,8 +145,10 @@ pub async fn list_prompts(
             let notes: Option<String> = row.get(7)?;
             let is_favorite_int: i64 = row.get(8)?;
             let character_id: Option<i64> = row.get(9)?;
-            let created_at: String = row.get(10)?;
-            let character_name: Option<String> = row.get(11)?;
+            let project_id: Option<i64> = row.get(10)?;
+            let created_at: String = row.get(11)?;
+            let updated_at: Option<String> = row.get(12)?;
+            let character_name: Option<String> = row.get(13)?;
 
             Ok((
                 id,
@@ -146,7 +161,9 @@ pub async fn list_prompts(
                 notes,
                 is_favorite_int,
                 character_id,
+                project_id,
                 created_at,
+                updated_at,
                 character_name,
             ))
         })
@@ -165,7 +182,9 @@ pub async fn list_prompts(
             notes,
             is_favorite_int,
             character_id,
+            project_id,
             created_at,
+            updated_at,
             character_name,
         ) = item.map_err(|e| AppError::Database(e.to_string()))?;
 
@@ -182,7 +201,9 @@ pub async fn list_prompts(
             notes,
             is_favorite: is_favorite_int != 0,
             character_id,
+            project_id,
             created_at,
+            updated_at,
             tags,
             character_name,
         });
@@ -210,14 +231,16 @@ pub async fn create_prompt(
     };
 
     let is_fav = if dto.is_favorite.unwrap_or(false) { 1 } else { 0 };
+    let project_id = dto.project_id.unwrap_or(1);
 
     let mut conn = state.pool.get().map_err(|e| AppError::Database(e.to_string()))?;
     let tx = conn.transaction().map_err(|e| AppError::Database(e.to_string()))?;
 
     tx.execute(
-        "INSERT INTO prompts (title, body, system_prompt, parameters, model_used, category, notes, is_favorite, character_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        "INSERT INTO prompts (project_id, title, body, system_prompt, parameters, model_used, category, notes, is_favorite, character_id, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, datetime('now'), datetime('now'))",
         params![
+            project_id,
             dto.title.trim(),
             dto.body,
             dto.system_prompt,
@@ -239,6 +262,7 @@ pub async fn create_prompt(
 
     tx.commit().map_err(|e| AppError::Database(e.to_string()))?;
 
+    let _ = sync_project_json(&conn, project_id, &state.data_dir);
     let prompt = get_prompt_by_id(&conn, prompt_id)?;
     Ok((StatusCode::CREATED, Json(prompt)))
 }
@@ -262,7 +286,8 @@ pub async fn update_prompt(
     let mut conn = state.pool.get().map_err(|e| AppError::Database(e.to_string()))?;
 
     // Check existence
-    let _existing = get_prompt_by_id(&conn, id)?;
+    let existing = get_prompt_by_id(&conn, id)?;
+    let project_id = existing.project_id.unwrap_or(1);
 
     let tx = conn.transaction().map_err(|e| AppError::Database(e.to_string()))?;
 
@@ -270,7 +295,7 @@ pub async fn update_prompt(
         if title.trim().is_empty() {
             return Err(AppError::BadRequest("Title cannot be empty".into()));
         }
-        tx.execute("UPDATE prompts SET title = ?1 WHERE id = ?2", params![title.trim(), id])
+        tx.execute("UPDATE prompts SET title = ?1, updated_at = datetime('now') WHERE id = ?2", params![title.trim(), id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
@@ -278,12 +303,12 @@ pub async fn update_prompt(
         if body.trim().is_empty() {
             return Err(AppError::BadRequest("Prompt body cannot be empty".into()));
         }
-        tx.execute("UPDATE prompts SET body = ?1 WHERE id = ?2", params![body, id])
+        tx.execute("UPDATE prompts SET body = ?1, updated_at = datetime('now') WHERE id = ?2", params![body, id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
     if dto.system_prompt.is_some() {
-        tx.execute("UPDATE prompts SET system_prompt = ?1 WHERE id = ?2", params![dto.system_prompt, id])
+        tx.execute("UPDATE prompts SET system_prompt = ?1, updated_at = datetime('now') WHERE id = ?2", params![dto.system_prompt, id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
@@ -292,33 +317,38 @@ pub async fn update_prompt(
             serde_json::Value::String(s) => s,
             other => other.to_string(),
         };
-        tx.execute("UPDATE prompts SET parameters = ?1 WHERE id = ?2", params![json_str, id])
+        tx.execute("UPDATE prompts SET parameters = ?1, updated_at = datetime('now') WHERE id = ?2", params![json_str, id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
     if dto.model_used.is_some() {
-        tx.execute("UPDATE prompts SET model_used = ?1 WHERE id = ?2", params![dto.model_used, id])
+        tx.execute("UPDATE prompts SET model_used = ?1, updated_at = datetime('now') WHERE id = ?2", params![dto.model_used, id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
     if dto.category.is_some() {
-        tx.execute("UPDATE prompts SET category = ?1 WHERE id = ?2", params![dto.category, id])
+        tx.execute("UPDATE prompts SET category = ?1, updated_at = datetime('now') WHERE id = ?2", params![dto.category, id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
     if dto.notes.is_some() {
-        tx.execute("UPDATE prompts SET notes = ?1 WHERE id = ?2", params![dto.notes, id])
+        tx.execute("UPDATE prompts SET notes = ?1, updated_at = datetime('now') WHERE id = ?2", params![dto.notes, id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
     if let Some(fav) = dto.is_favorite {
         let fav_int = if fav { 1 } else { 0 };
-        tx.execute("UPDATE prompts SET is_favorite = ?1 WHERE id = ?2", params![fav_int, id])
+        tx.execute("UPDATE prompts SET is_favorite = ?1, updated_at = datetime('now') WHERE id = ?2", params![fav_int, id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
     if dto.character_id.is_some() {
-        tx.execute("UPDATE prompts SET character_id = ?1 WHERE id = ?2", params![dto.character_id, id])
+        tx.execute("UPDATE prompts SET character_id = ?1, updated_at = datetime('now') WHERE id = ?2", params![dto.character_id, id])
+            .map_err(|e| AppError::Database(e.to_string()))?;
+    }
+
+    if let Some(new_pid) = dto.project_id {
+        tx.execute("UPDATE prompts SET project_id = ?1, updated_at = datetime('now') WHERE id = ?2", params![new_pid, id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
@@ -329,6 +359,7 @@ pub async fn update_prompt(
 
     tx.commit().map_err(|e| AppError::Database(e.to_string()))?;
 
+    let _ = sync_project_json(&conn, project_id, &state.data_dir);
     let updated = get_prompt_by_id(&conn, id)?;
     Ok(Json(updated))
 }
@@ -343,10 +374,14 @@ pub async fn toggle_favorite(
 
     let new_fav = if prompt.is_favorite { 0 } else { 1 };
     conn.execute(
-        "UPDATE prompts SET is_favorite = ?1 WHERE id = ?2",
+        "UPDATE prompts SET is_favorite = ?1, updated_at = datetime('now') WHERE id = ?2",
         params![new_fav, id],
     )
     .map_err(|e| AppError::Database(e.to_string()))?;
+
+    if let Some(pid) = prompt.project_id {
+        let _ = sync_project_json(&conn, pid, &state.data_dir);
+    }
 
     let updated = get_prompt_by_id(&conn, id)?;
     Ok(Json(updated))
@@ -358,7 +393,7 @@ pub async fn delete_prompt(
     Path(id): Path<i64>,
 ) -> Result<impl IntoResponse, AppError> {
     let conn = state.pool.get().map_err(|e| AppError::Database(e.to_string()))?;
-    let _prompt = get_prompt_by_id(&conn, id)?;
+    let prompt = get_prompt_by_id(&conn, id)?;
 
     conn.execute("DELETE FROM prompts WHERE id = ?1", params![id])
         .map_err(|e| AppError::Database(e.to_string()))?;
@@ -376,6 +411,10 @@ pub async fn delete_prompt(
     )
     .ok();
 
+    if let Some(pid) = prompt.project_id {
+        let _ = sync_project_json(&conn, pid, &state.data_dir);
+    }
+
     Ok(Json(json!({
         "status": "success",
         "id": id
@@ -386,7 +425,8 @@ pub fn get_prompt_by_id(conn: &Connection, id: i64) -> Result<Prompt, AppError> 
     let mut stmt = conn
         .prepare(
             "SELECT p.id, p.title, p.body, p.system_prompt, p.parameters, p.model_used,
-                    p.category, p.notes, p.is_favorite, p.character_id, p.created_at,
+                    p.category, p.notes, p.is_favorite, p.character_id, p.project_id,
+                    p.created_at, p.updated_at,
                     c.name as character_name
              FROM prompts p
              LEFT JOIN characters c ON p.character_id = c.id

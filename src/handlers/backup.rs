@@ -28,7 +28,7 @@ use crate::{
 pub fn extract_full_backup_data(conn: &Connection) -> Result<FullBackupData, rusqlite::Error> {
     // 1. Characters
     let mut stmt = conn.prepare(
-        "SELECT id, name, description, traits, image_path, notes, created_at FROM characters ORDER BY id ASC",
+        "SELECT id, name, description, traits, image_path, notes, project_id, created_at, updated_at FROM characters ORDER BY id ASC",
     )?;
     let characters = stmt
         .query_map([], |row| {
@@ -39,7 +39,9 @@ pub fn extract_full_backup_data(conn: &Connection) -> Result<FullBackupData, rus
                 traits: row.get(3)?,
                 image_path: row.get(4)?,
                 notes: row.get(5)?,
-                created_at: row.get(6)?,
+                project_id: row.get(6)?,
+                created_at: row.get(7)?,
+                updated_at: row.get(8)?,
                 tags: Vec::new(),
                 prompts_count: None,
                 prompts: None,
@@ -49,7 +51,7 @@ pub fn extract_full_backup_data(conn: &Connection) -> Result<FullBackupData, rus
 
     // 2. Prompts
     let mut stmt = conn.prepare(
-        "SELECT id, title, body, system_prompt, parameters, model_used, category, notes, is_favorite, character_id, created_at
+        "SELECT id, title, body, system_prompt, parameters, model_used, category, notes, is_favorite, character_id, project_id, created_at, updated_at
          FROM prompts ORDER BY id ASC",
     )?;
     let prompts = stmt
@@ -66,7 +68,9 @@ pub fn extract_full_backup_data(conn: &Connection) -> Result<FullBackupData, rus
                 notes: row.get(7)?,
                 is_favorite: is_fav != 0,
                 character_id: row.get(9)?,
-                created_at: row.get(10)?,
+                project_id: row.get(10)?,
+                created_at: row.get(11)?,
+                updated_at: row.get(12)?,
                 tags: Vec::new(),
                 character_name: None,
             })
@@ -75,7 +79,7 @@ pub fn extract_full_backup_data(conn: &Connection) -> Result<FullBackupData, rus
 
     // 3. Links
     let mut stmt = conn.prepare(
-        "SELECT id, url, platform, title, description, thumbnail_url, created_at FROM links ORDER BY id ASC",
+        "SELECT id, url, platform, title, description, thumbnail_url, project_id, created_at, updated_at FROM links ORDER BY id ASC",
     )?;
     let links = stmt
         .query_map([], |row| {
@@ -86,7 +90,9 @@ pub fn extract_full_backup_data(conn: &Connection) -> Result<FullBackupData, rus
                 title: row.get(3)?,
                 description: row.get(4)?,
                 thumbnail_url: row.get(5)?,
-                created_at: row.get(6)?,
+                project_id: row.get(6)?,
+                created_at: row.get(7)?,
+                updated_at: row.get(8)?,
                 tags: Vec::new(),
             })
         })?
@@ -119,7 +125,7 @@ pub fn extract_full_backup_data(conn: &Connection) -> Result<FullBackupData, rus
 
     // 6. Boards
     let mut stmt = conn.prepare(
-        "SELECT id, name, theme, canvas_style, pan_x, pan_y, zoom, drawing_data, created_at FROM boards ORDER BY id ASC",
+        "SELECT id, name, theme, canvas_style, pan_x, pan_y, zoom, drawing_data, project_id, created_at, updated_at FROM boards ORDER BY id ASC",
     )?;
     let boards = stmt
         .query_map([], |row| {
@@ -134,7 +140,9 @@ pub fn extract_full_backup_data(conn: &Connection) -> Result<FullBackupData, rus
                 pan_y: row.get(5)?,
                 zoom: row.get(6)?,
                 drawing_data,
-                created_at: row.get(8)?,
+                project_id: row.get(8)?,
+                created_at: row.get(9)?,
+                updated_at: row.get(10)?,
                 items_count: None,
             })
         })?
@@ -200,10 +208,12 @@ pub fn restore_full_backup_data(
 
     // 1. Characters
     for c in &data.characters {
+        let pid = c.project_id.unwrap_or(1);
+        let up = c.updated_at.as_deref().unwrap_or(&c.created_at);
         tx.execute(
-            "INSERT INTO characters (id, name, description, traits, image_path, notes, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            params![c.id, c.name, c.description, c.traits, c.image_path, c.notes, c.created_at],
+            "INSERT INTO characters (id, project_id, name, description, traits, image_path, notes, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![c.id, pid, c.name, c.description, c.traits, c.image_path, c.notes, c.created_at, up],
         )
         .map_err(|e| AppError::Database(e.to_string()))?;
     }
@@ -211,11 +221,14 @@ pub fn restore_full_backup_data(
     // 2. Prompts
     for p in &data.prompts {
         let is_fav = if p.is_favorite { 1 } else { 0 };
+        let pid = p.project_id.unwrap_or(1);
+        let up = p.updated_at.as_deref().unwrap_or(&p.created_at);
         tx.execute(
-            "INSERT INTO prompts (id, title, body, system_prompt, parameters, model_used, category, notes, is_favorite, character_id, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            "INSERT INTO prompts (id, project_id, title, body, system_prompt, parameters, model_used, category, notes, is_favorite, character_id, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
             params![
                 p.id,
+                pid,
                 p.title,
                 p.body,
                 p.system_prompt,
@@ -226,6 +239,7 @@ pub fn restore_full_backup_data(
                 is_fav,
                 p.character_id,
                 p.created_at,
+                up,
             ],
         )
         .map_err(|e| AppError::Database(e.to_string()))?;
@@ -233,10 +247,12 @@ pub fn restore_full_backup_data(
 
     // 3. Links
     for l in &data.links {
+        let pid = l.project_id.unwrap_or(1);
+        let up = l.updated_at.as_deref().unwrap_or(&l.created_at);
         tx.execute(
-            "INSERT INTO links (id, url, platform, title, description, thumbnail_url, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            params![l.id, l.url, l.platform, l.title, l.description, l.thumbnail_url, l.created_at],
+            "INSERT INTO links (id, project_id, url, platform, title, description, thumbnail_url, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![l.id, pid, l.url, l.platform, l.title, l.description, l.thumbnail_url, l.created_at, up],
         )
         .map_err(|e| AppError::Database(e.to_string()))?;
     }
@@ -262,11 +278,14 @@ pub fn restore_full_backup_data(
     // 6. Boards
     for b in &data.boards {
         let drawing_data_str = b.drawing_data.to_string();
+        let pid = b.project_id.unwrap_or(1);
+        let up = b.updated_at.as_deref().unwrap_or(&b.created_at);
         tx.execute(
-            "INSERT INTO boards (id, name, theme, canvas_style, pan_x, pan_y, zoom, drawing_data, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            "INSERT INTO boards (id, project_id, name, theme, canvas_style, pan_x, pan_y, zoom, drawing_data, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             params![
                 b.id,
+                pid,
                 b.name,
                 b.theme,
                 b.canvas_style,
@@ -275,6 +294,7 @@ pub fn restore_full_backup_data(
                 b.zoom,
                 drawing_data_str,
                 b.created_at,
+                up,
             ],
         )
         .map_err(|e| AppError::Database(e.to_string()))?;

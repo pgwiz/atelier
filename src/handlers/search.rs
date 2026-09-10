@@ -19,6 +19,7 @@ pub struct SearchQueryParams {
     #[serde(rename = "type")]
     pub entity_type: Option<String>,
     pub favorite: Option<bool>,
+    pub project_id: Option<i64>,
 }
 
 pub fn search_entities(
@@ -48,6 +49,11 @@ pub fn search_entities(
              WHERE 1=1",
         );
         let mut bind_params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+        if let Some(pid) = params.project_id {
+            sql.push_str(" AND p.project_id = ?");
+            bind_params.push(Box::new(pid));
+        }
 
         if let Some(fav) = params.favorite {
             sql.push_str(" AND p.is_favorite = ?");
@@ -115,6 +121,11 @@ pub fn search_entities(
         );
         let mut bind_params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
+        if let Some(pid) = params.project_id {
+            sql.push_str(" AND c.project_id = ?");
+            bind_params.push(Box::new(pid));
+        }
+
         if let Some(q) = q_trimmed {
             let pattern = format!("%{}%", q);
             sql.push_str(" AND (c.name LIKE ? OR c.description LIKE ? OR c.traits LIKE ? OR c.notes LIKE ?)");
@@ -179,6 +190,11 @@ pub fn search_entities(
              WHERE 1=1",
         );
         let mut bind_params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+        if let Some(pid) = params.project_id {
+            sql.push_str(" AND l.project_id = ?");
+            bind_params.push(Box::new(pid));
+        }
 
         if let Some(q) = q_trimmed {
             let pattern = format!("%{}%", q);

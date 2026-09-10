@@ -2,6 +2,41 @@
 
 All notable changes to Atelier will be documented in this file.
 
+## [0.3.0] - 2026-09-10
+
+### Added
+- **Projects-First Creative OS Architecture**:
+  - Central SQLite indexing (`data/atelier.db`) coupled with dedicated folder per project (`data/projects/<id>/`).
+  - Auto-synced disk manifest (`project.json`) and structured media folders (`audio/`, `documents/`, `images/`, `videos/`, `exports/`).
+  - Disk reload endpoint (`POST /api/projects/:id/reload-json`) to reconcile external edits or backups.
+  - Projects dashboard as root landing view (`#view-projects`) with progress calculation, status chips, and metadata cards.
+  - Collapsible sidebar project switcher with stat chips (`Prompts: X`, `Cast: Y`, `Links: Z`, `Boards: W`, `Parts: V`) and compressed 36x36px icon mode.
+- **Ordered Production Parts (Scenes, Chapters, Segments, Voiceovers)**:
+  - Sequence-indexed production workflow with status lifecycle (`Draft` -> `In Progress` -> `Ready` -> `Done`) and `completed_at` timestamps.
+  - Dedicated production parts view (`#view-parts`) with timeline, filtering, and script/notes editor.
+  - Interactive canvas mini-parts on the visual planning canvas with status cycling and connector anchors.
+  - Many-to-many asset linkage associating parts with characters, prompts, and reference links.
+- **Custom Addons & Media Attachments**:
+  - In-app audio player supporting 0.75x to 2.0x variable playback speeds and scrubbing.
+  - Monospace document/script reader, PDF embedded viewer, and video player modal.
+  - Native OS File Explorer reveal (`POST /api/fs/reveal` and `POST /api/projects/:id/open-folder`) with path traversal security.
+  - Raw binary file streaming at `/files/projects/:id/*path`.
+- **Multi-Workspace Operations**:
+  - Deep copy (`POST /api/projects/:id/copy`) duplicating database entities, media folders, and auto-syncing `project.json`.
+  - Non-destructive workspace merge (`POST /api/projects/:id/merge`) with duplicate title collision protection and asset preservation.
+  - Visual transfer workbench (`POST /api/projects/transfer`) supporting granular selective moves and copies across projects.
+  - Standalone project package export/import (`.zip`) with checksum verification and manifest reconciliation.
+
+### Fixed & Hardened
+- **Zip Slip Vulnerability in Archive Import**: Enforced `file.enclosed_name()` and canonical jail-boundary verification during `.zip` package extraction to block arbitrary filesystem traversal attacks.
+- **Board Item Part Remapping in Deep Copy & Merge**: Corrected second-pass remapping for board items of type `part` to ensure `entity_id` references the cloned/merged part ID in the target workspace.
+- **Workspace Boundary Integrity**: Blocked deletion of the last remaining project with an explicit 400 Bad Request guard, and added transactional cascading across all child entity tables on project deletion.
+- **Windows File Explorer Path Normalization**: Stripped UNC path prefix (`\\?\`) before launching `explorer.exe` to prevent native explorer process failures on Windows.
+- **Transfer Items Response Contract**: Added `transferred_count` to the `POST /api/projects/transfer` JSON response to align with frontend toast notification expectations.
+- **Manual Disk Reload SQL Parameter Alignment**: Fixed parameter mismatch in `project_parts` SQL insertion during disk reload, and gracefully handled unassigned or zero project IDs.
+- **Hash-Routing & Permalinks**: Implemented client-side hash routing (`/#/projects/:id/...`) supporting browser history navigation and project permalink copying.
+- **Strict Design System Adherence**: Enforced max 8px border-radius, zero gradients, and zero emojis across all newly added Phase 9 UI components.
+
 ## [0.2.0] - 2026-09-10
 
 ### Changed

@@ -1,7 +1,11 @@
+pub mod attachments;
 pub mod backup;
 pub mod boards;
 pub mod characters;
+pub mod filesystem;
 pub mod links;
+pub mod parts;
+pub mod projects;
 pub mod prompts;
 pub mod search;
 pub mod tags;

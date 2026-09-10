@@ -1,20 +1,30 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     Json,
 };
 use rusqlite::{params, Connection};
+use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
-    handlers::{safe_truncate, tags::get_tags_for_entity},
+    handlers::{
+        projects::sync_project_json,
+        safe_truncate,
+        tags::get_tags_for_entity,
+    },
     main_types::{AppError, AppState},
     models::{
         Board, BoardItem, CreateBoardDto, CreateBoardItemDto, PatchBoardItemDto,
         SingleBoardExport, UpdateBoardDto, UpdateDrawingDto,
     },
 };
+
+#[derive(Debug, Deserialize)]
+pub struct BoardFilterParams {
+    pub project_id: Option<i64>,
+}
 
 fn row_to_board(row: &rusqlite::Row) -> Result<Board, rusqlite::Error> {
     let id: i64 = row.get(0)?;
@@ -25,8 +35,10 @@ fn row_to_board(row: &rusqlite::Row) -> Result<Board, rusqlite::Error> {
     let pan_y: f64 = row.get(5)?;
     let zoom: f64 = row.get(6)?;
     let drawing_data_str: String = row.get(7)?;
-    let created_at: String = row.get(8)?;
-    let items_count: Option<i64> = row.get(9).ok();
+    let project_id: Option<i64> = row.get(8)?;
+    let created_at: String = row.get(9)?;
+    let updated_at: Option<String> = row.get(10)?;
+    let items_count: Option<i64> = row.get(11).ok();
 
     let drawing_data: serde_json::Value = serde_json::from_str(&drawing_data_str)
         .unwrap_or_else(|_| serde_json::json!([]));
@@ -40,7 +52,9 @@ fn row_to_board(row: &rusqlite::Row) -> Result<Board, rusqlite::Error> {
         pan_y,
         zoom,
         drawing_data,
+        project_id,
         created_at,
+        updated_at,
         items_count,
     })
 }
@@ -48,22 +62,33 @@ fn row_to_board(row: &rusqlite::Row) -> Result<Board, rusqlite::Error> {
 // GET /api/boards
 pub async fn list_boards(
     State(state): State<AppState>,
+    Query(params): Query<BoardFilterParams>,
 ) -> Result<impl IntoResponse, AppError> {
     let conn = state.pool.get().map_err(|e| AppError::Database(e.to_string()))?;
 
-    let mut stmt = conn
-        .prepare(
-            "SELECT b.id, b.name, b.theme, b.canvas_style, b.pan_x, b.pan_y, b.zoom,
-                    b.drawing_data, b.created_at, COUNT(bi.id) as items_count
-             FROM boards b
-             LEFT JOIN board_items bi ON b.id = bi.board_id
-             GROUP BY b.id
-             ORDER BY b.id DESC",
-        )
-        .map_err(|e| AppError::Database(e.to_string()))?;
+    let mut sql = String::from(
+        "SELECT b.id, b.name, b.theme, b.canvas_style, b.pan_x, b.pan_y, b.zoom,
+                b.drawing_data, b.project_id, b.created_at, b.updated_at, COUNT(bi.id) as items_count
+         FROM boards b
+         LEFT JOIN board_items bi ON b.id = bi.board_id
+         WHERE 1=1",
+    );
+
+    let mut bind_params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+    if let Some(pid) = params.project_id {
+        sql.push_str(" AND b.project_id = ?");
+        bind_params.push(Box::new(pid));
+    }
+
+    sql.push_str(" GROUP BY b.id ORDER BY b.id DESC");
+
+    let mut stmt = conn.prepare(&sql).map_err(|e| AppError::Database(e.to_string()))?;
+
+    let rusqlite_params: Vec<&dyn rusqlite::ToSql> = bind_params.iter().map(|p| p.as_ref()).collect();
 
     let rows = stmt
-        .query_map([], |row| row_to_board(row))
+        .query_map(rusqlite_params.as_slice(), |row| row_to_board(row))
         .map_err(|e| AppError::Database(e.to_string()))?;
 
     let mut boards = Vec::new();
@@ -85,17 +110,20 @@ pub async fn create_board(
 
     let theme = dto.theme.unwrap_or_else(|| "default".into());
     let canvas_style = dto.canvas_style.unwrap_or_else(|| "dot-grid".into());
+    let project_id = dto.project_id.unwrap_or(1);
 
     let conn = state.pool.get().map_err(|e| AppError::Database(e.to_string()))?;
 
     conn.execute(
-        "INSERT INTO boards (name, theme, canvas_style, pan_x, pan_y, zoom, drawing_data)
-         VALUES (?1, ?2, ?3, 0.0, 0.0, 1.0, '[]')",
-        params![dto.name.trim(), theme, canvas_style],
+        "INSERT INTO boards (project_id, name, theme, canvas_style, pan_x, pan_y, zoom, drawing_data, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, 0.0, 0.0, 1.0, '[]', datetime('now'), datetime('now'))",
+        params![project_id, dto.name.trim(), theme, canvas_style],
     )
     .map_err(|e| AppError::Database(e.to_string()))?;
 
     let board_id = conn.last_insert_rowid();
+
+    let _ = sync_project_json(&conn, project_id, &state.data_dir);
     let board = get_board_by_id(&conn, board_id)?;
 
     Ok((StatusCode::CREATED, Json(board)))
@@ -118,46 +146,54 @@ pub async fn update_board(
     Json(dto): Json<UpdateBoardDto>,
 ) -> Result<impl IntoResponse, AppError> {
     let conn = state.pool.get().map_err(|e| AppError::Database(e.to_string()))?;
-    let _existing = get_board_by_id(&conn, id)?;
+    let existing = get_board_by_id(&conn, id)?;
+    let project_id = existing.project_id.unwrap_or(1);
 
     if let Some(name) = dto.name {
-        if !name.trim().is_empty() {
-            conn.execute("UPDATE boards SET name = ?1 WHERE id = ?2", params![name.trim(), id])
-                .map_err(|e| AppError::Database(e.to_string()))?;
+        if name.trim().is_empty() {
+            return Err(AppError::BadRequest("Board name cannot be empty".into()));
         }
-    }
-
-    if let Some(theme) = dto.theme {
-        conn.execute("UPDATE boards SET theme = ?1 WHERE id = ?2", params![theme, id])
+        conn.execute("UPDATE boards SET name = ?1, updated_at = datetime('now') WHERE id = ?2", params![name.trim(), id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
-    if let Some(canvas_style) = dto.canvas_style {
-        conn.execute("UPDATE boards SET canvas_style = ?1 WHERE id = ?2", params![canvas_style, id])
+    if dto.theme.is_some() {
+        conn.execute("UPDATE boards SET theme = ?1, updated_at = datetime('now') WHERE id = ?2", params![dto.theme, id])
+            .map_err(|e| AppError::Database(e.to_string()))?;
+    }
+
+    if dto.canvas_style.is_some() {
+        conn.execute("UPDATE boards SET canvas_style = ?1, updated_at = datetime('now') WHERE id = ?2", params![dto.canvas_style, id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
     if let Some(pan_x) = dto.pan_x {
-        conn.execute("UPDATE boards SET pan_x = ?1 WHERE id = ?2", params![pan_x, id])
+        conn.execute("UPDATE boards SET pan_x = ?1, updated_at = datetime('now') WHERE id = ?2", params![pan_x, id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
     if let Some(pan_y) = dto.pan_y {
-        conn.execute("UPDATE boards SET pan_y = ?1 WHERE id = ?2", params![pan_y, id])
+        conn.execute("UPDATE boards SET pan_y = ?1, updated_at = datetime('now') WHERE id = ?2", params![pan_y, id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
     if let Some(zoom) = dto.zoom {
-        conn.execute("UPDATE boards SET zoom = ?1 WHERE id = ?2", params![zoom, id])
+        conn.execute("UPDATE boards SET zoom = ?1, updated_at = datetime('now') WHERE id = ?2", params![zoom, id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
-    if let Some(drawing_data) = dto.drawing_data {
-        let drawing_str = drawing_data.to_string();
-        conn.execute("UPDATE boards SET drawing_data = ?1 WHERE id = ?2", params![drawing_str, id])
+    if let Some(drawing) = dto.drawing_data {
+        let drawing_str = drawing.to_string();
+        conn.execute("UPDATE boards SET drawing_data = ?1, updated_at = datetime('now') WHERE id = ?2", params![drawing_str, id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
+    if let Some(new_pid) = dto.project_id {
+        conn.execute("UPDATE boards SET project_id = ?1, updated_at = datetime('now') WHERE id = ?2", params![new_pid, id])
+            .map_err(|e| AppError::Database(e.to_string()))?;
+    }
+
+    let _ = sync_project_json(&conn, project_id, &state.data_dir);
     let updated = get_board_by_id(&conn, id)?;
     Ok(Json(updated))
 }
@@ -169,14 +205,17 @@ pub async fn update_board_drawing(
     Json(dto): Json<UpdateDrawingDto>,
 ) -> Result<impl IntoResponse, AppError> {
     let conn = state.pool.get().map_err(|e| AppError::Database(e.to_string()))?;
-    let _existing = get_board_by_id(&conn, id)?;
+    let existing = get_board_by_id(&conn, id)?;
+    let project_id = existing.project_id.unwrap_or(1);
 
     let drawing_str = dto.drawing_data.to_string();
     conn.execute(
-        "UPDATE boards SET drawing_data = ?1 WHERE id = ?2",
+        "UPDATE boards SET drawing_data = ?1, updated_at = datetime('now') WHERE id = ?2",
         params![drawing_str, id],
     )
     .map_err(|e| AppError::Database(e.to_string()))?;
+
+    let _ = sync_project_json(&conn, project_id, &state.data_dir);
 
     Ok(Json(json!({
         "status": "success",
@@ -190,10 +229,13 @@ pub async fn delete_board(
     Path(id): Path<i64>,
 ) -> Result<impl IntoResponse, AppError> {
     let conn = state.pool.get().map_err(|e| AppError::Database(e.to_string()))?;
-    let _existing = get_board_by_id(&conn, id)?;
+    let existing = get_board_by_id(&conn, id)?;
+    let project_id = existing.project_id.unwrap_or(1);
 
     conn.execute("DELETE FROM boards WHERE id = ?1", params![id])
         .map_err(|e| AppError::Database(e.to_string()))?;
+
+    let _ = sync_project_json(&conn, project_id, &state.data_dir);
 
     Ok(Json(json!({
         "status": "success",
@@ -220,12 +262,13 @@ pub async fn create_board_item(
     Json(dto): Json<CreateBoardItemDto>,
 ) -> Result<impl IntoResponse, AppError> {
     let conn = state.pool.get().map_err(|e| AppError::Database(e.to_string()))?;
-    let _board = get_board_by_id(&conn, id)?;
+    let board = get_board_by_id(&conn, id)?;
+    let project_id = board.project_id.unwrap_or(1);
 
-    let valid_types = ["prompt", "character", "link", "note"];
+    let valid_types = ["prompt", "character", "link", "note", "part"];
     if !valid_types.contains(&dto.entity_type.as_str()) {
         return Err(AppError::BadRequest(format!(
-            "Invalid entity_type '{}'. Must be prompt, character, link, or note",
+            "Invalid entity_type '{}'. Must be prompt, character, link, note, or part",
             dto.entity_type
         )));
     }
@@ -245,6 +288,9 @@ pub async fn create_board_item(
             "link" => conn
                 .query_row("SELECT EXISTS(SELECT 1 FROM links WHERE id = ?1)", params![eid], |r| r.get(0))
                 .unwrap_or(false),
+            "part" => conn
+                .query_row("SELECT EXISTS(SELECT 1 FROM project_parts WHERE id = ?1)", params![eid], |r| r.get(0))
+                .unwrap_or(false),
             _ => false,
         };
 
@@ -263,8 +309,8 @@ pub async fn create_board_item(
     let z_index = dto.z_index.unwrap_or(0);
 
     conn.execute(
-        "INSERT INTO board_items (board_id, entity_type, entity_id, note_text, pos_x, pos_y, width, height, z_index, color)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        "INSERT INTO board_items (board_id, entity_type, entity_id, note_text, pos_x, pos_y, width, height, z_index, color, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, datetime('now'))",
         params![
             id,
             dto.entity_type,
@@ -280,8 +326,11 @@ pub async fn create_board_item(
     ).map_err(|e| AppError::Database(e.to_string()))?;
 
     let item_id = conn.last_insert_rowid();
-    let item = get_board_item_by_id(&conn, item_id)?;
 
+    let _ = conn.execute("UPDATE boards SET updated_at = datetime('now') WHERE id = ?", [id]);
+    let _ = sync_project_json(&conn, project_id, &state.data_dir);
+
+    let item = get_board_item_by_id(&conn, item_id)?;
     Ok((StatusCode::CREATED, Json(item)))
 }
 
@@ -299,6 +348,9 @@ pub async fn patch_board_item(
             item_id, board_id
         )));
     }
+
+    let board = get_board_by_id(&conn, board_id)?;
+    let project_id = board.project_id.unwrap_or(1);
 
     if let Some(x) = dto.pos_x {
         conn.execute("UPDATE board_items SET pos_x = ?1 WHERE id = ?2", params![x, item_id])
@@ -329,6 +381,9 @@ pub async fn patch_board_item(
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
+    let _ = conn.execute("UPDATE boards SET updated_at = datetime('now') WHERE id = ?", [board_id]);
+    let _ = sync_project_json(&conn, project_id, &state.data_dir);
+
     let updated = get_board_item_by_id(&conn, item_id)?;
     Ok(Json(updated))
 }
@@ -347,8 +402,14 @@ pub async fn delete_board_item(
         )));
     }
 
+    let board = get_board_by_id(&conn, board_id)?;
+    let project_id = board.project_id.unwrap_or(1);
+
     conn.execute("DELETE FROM board_items WHERE id = ?1", params![item_id])
         .map_err(|e| AppError::Database(e.to_string()))?;
+
+    let _ = conn.execute("UPDATE boards SET updated_at = datetime('now') WHERE id = ?", [board_id]);
+    let _ = sync_project_json(&conn, project_id, &state.data_dir);
 
     Ok(Json(json!({
         "status": "success",
@@ -372,7 +433,7 @@ pub fn get_board_by_id(conn: &Connection, id: i64) -> Result<Board, AppError> {
     let mut stmt = conn
         .prepare(
             "SELECT b.id, b.name, b.theme, b.canvas_style, b.pan_x, b.pan_y, b.zoom,
-                    b.drawing_data, b.created_at, COUNT(bi.id) as items_count
+                    b.drawing_data, b.project_id, b.created_at, b.updated_at, COUNT(bi.id) as items_count
              FROM boards b
              LEFT JOIN board_items bi ON b.id = bi.board_id
              WHERE b.id = ?1
@@ -508,6 +569,17 @@ pub fn get_items_for_board(conn: &Connection, board_id: i64) -> Result<Vec<Board
                         entity_tags = get_tags_for_entity(conn, "link", eid).unwrap_or_default();
                     }
                 }
+                "part" => {
+                    if let Ok((title, ptype, status)) = conn.query_row(
+                        "SELECT title, part_type, status FROM project_parts WHERE id = ?1",
+                        params![eid],
+                        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?)),
+                    ) {
+                        entity_title = Some(title);
+                        entity_subtitle = Some(format!("{} • {}", ptype, status));
+                        entity_tags = Vec::new();
+                    }
+                }
                 _ => {}
             }
         }
@@ -636,6 +708,17 @@ pub fn get_board_item_by_id(conn: &Connection, item_id: i64) -> Result<BoardItem
                     entity_subtitle = Some(url);
                     entity_image = thumb;
                     entity_tags = get_tags_for_entity(conn, "link", eid).unwrap_or_default();
+                }
+            }
+            "part" => {
+                if let Ok((title, ptype, status)) = conn.query_row(
+                    "SELECT title, part_type, status FROM project_parts WHERE id = ?1",
+                    params![eid],
+                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?)),
+                ) {
+                    entity_title = Some(title);
+                    entity_subtitle = Some(format!("{} • {}", ptype, status));
+                    entity_tags = Vec::new();
                 }
             }
             _ => {}

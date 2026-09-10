@@ -1,26 +1,41 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     Json,
 };
 use rusqlite::{params, Connection};
+use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
-    handlers::tags::{get_tags_for_entity, set_entity_tags},
+    handlers::{
+        projects::sync_project_json,
+        tags::{get_tags_for_entity, set_entity_tags},
+    },
     main_types::{AppError, AppState},
     models::{Character, CreateCharacterDto, Prompt, UpdateCharacterDto},
 };
 
-fn row_to_character(conn: &Connection, row: &rusqlite::Row, include_prompts: bool) -> Result<Character, rusqlite::Error> {
+#[derive(Debug, Deserialize)]
+pub struct CharacterFilterParams {
+    pub project_id: Option<i64>,
+}
+
+fn row_to_character(
+    conn: &Connection,
+    row: &rusqlite::Row,
+    include_prompts: bool,
+) -> Result<Character, rusqlite::Error> {
     let id: i64 = row.get(0)?;
     let name: String = row.get(1)?;
     let description: Option<String> = row.get(2)?;
     let traits: Option<String> = row.get(3)?;
     let image_path: Option<String> = row.get(4)?;
     let notes: Option<String> = row.get(5)?;
-    let created_at: String = row.get(6)?;
+    let project_id: Option<i64> = row.get(6)?;
+    let created_at: String = row.get(7)?;
+    let updated_at: Option<String> = row.get(8)?;
 
     let tags = get_tags_for_entity(conn, "character", id).unwrap_or_default();
 
@@ -35,7 +50,8 @@ fn row_to_character(conn: &Connection, row: &rusqlite::Row, include_prompts: boo
     let prompts = if include_prompts {
         let mut stmt = conn.prepare(
             "SELECT p.id, p.title, p.body, p.system_prompt, p.parameters, p.model_used,
-                    p.category, p.notes, p.is_favorite, p.character_id, p.created_at
+                    p.category, p.notes, p.is_favorite, p.character_id, p.project_id,
+                    p.created_at, p.updated_at
              FROM prompts p
              WHERE p.character_id = ?1
              ORDER BY p.id DESC",
@@ -52,7 +68,9 @@ fn row_to_character(conn: &Connection, row: &rusqlite::Row, include_prompts: boo
             let p_notes: Option<String> = p_row.get(7)?;
             let p_fav: i64 = p_row.get(8)?;
             let p_char_id: Option<i64> = p_row.get(9)?;
-            let p_created_at: String = p_row.get(10)?;
+            let p_proj_id: Option<i64> = p_row.get(10)?;
+            let p_created_at: String = p_row.get(11)?;
+            let p_updated_at: Option<String> = p_row.get(12)?;
 
             let p_tags = get_tags_for_entity(conn, "prompt", p_id).unwrap_or_default();
 
@@ -67,7 +85,9 @@ fn row_to_character(conn: &Connection, row: &rusqlite::Row, include_prompts: boo
                 notes: p_notes,
                 is_favorite: p_fav != 0,
                 character_id: p_char_id,
+                project_id: p_proj_id,
                 created_at: p_created_at,
+                updated_at: p_updated_at,
                 tags: p_tags,
                 character_name: Some(name.clone()),
             })
@@ -89,7 +109,9 @@ fn row_to_character(conn: &Connection, row: &rusqlite::Row, include_prompts: boo
         traits,
         image_path,
         notes,
+        project_id,
         created_at,
+        updated_at,
         tags,
         prompts_count: Some(count),
         prompts,
@@ -99,33 +121,46 @@ fn row_to_character(conn: &Connection, row: &rusqlite::Row, include_prompts: boo
 // GET /api/characters
 pub async fn list_characters(
     State(state): State<AppState>,
+    Query(params): Query<CharacterFilterParams>,
 ) -> Result<impl IntoResponse, AppError> {
     let conn = state.pool.get().map_err(|e| AppError::Database(e.to_string()))?;
 
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, name, description, traits, image_path, notes, created_at
-             FROM characters
-             ORDER BY name COLLATE NOCASE ASC",
-        )
-        .map_err(|e| AppError::Database(e.to_string()))?;
+    let mut sql = String::from(
+        "SELECT id, name, description, traits, image_path, notes, project_id, created_at, updated_at
+         FROM characters WHERE 1=1",
+    );
+
+    let mut bind_params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+    if let Some(pid) = params.project_id {
+        sql.push_str(" AND project_id = ?");
+        bind_params.push(Box::new(pid));
+    }
+
+    sql.push_str(" ORDER BY name COLLATE NOCASE ASC");
+
+    let mut stmt = conn.prepare(&sql).map_err(|e| AppError::Database(e.to_string()))?;
+
+    let rusqlite_params: Vec<&dyn rusqlite::ToSql> = bind_params.iter().map(|p| p.as_ref()).collect();
 
     let rows = stmt
-        .query_map([], |row| {
+        .query_map(rusqlite_params.as_slice(), |row| {
             let id: i64 = row.get(0)?;
             let name: String = row.get(1)?;
             let description: Option<String> = row.get(2)?;
             let traits: Option<String> = row.get(3)?;
             let image_path: Option<String> = row.get(4)?;
             let notes: Option<String> = row.get(5)?;
-            let created_at: String = row.get(6)?;
-            Ok((id, name, description, traits, image_path, notes, created_at))
+            let project_id: Option<i64> = row.get(6)?;
+            let created_at: String = row.get(7)?;
+            let updated_at: Option<String> = row.get(8)?;
+            Ok((id, name, description, traits, image_path, notes, project_id, created_at, updated_at))
         })
         .map_err(|e| AppError::Database(e.to_string()))?;
 
     let mut list = Vec::new();
     for row in rows {
-        let (id, name, description, traits, image_path, notes, created_at) =
+        let (id, name, description, traits, image_path, notes, project_id, created_at, updated_at) =
             row.map_err(|e| AppError::Database(e.to_string()))?;
 
         let tags = get_tags_for_entity(&conn, "character", id).unwrap_or_default();
@@ -144,7 +179,9 @@ pub async fn list_characters(
             traits,
             image_path,
             notes,
+            project_id,
             created_at,
+            updated_at,
             tags,
             prompts_count: Some(count),
             prompts: None,
@@ -163,13 +200,16 @@ pub async fn create_character(
         return Err(AppError::BadRequest("Character name cannot be empty".into()));
     }
 
+    let project_id = dto.project_id.unwrap_or(1);
+
     let mut conn = state.pool.get().map_err(|e| AppError::Database(e.to_string()))?;
     let tx = conn.transaction().map_err(|e| AppError::Database(e.to_string()))?;
 
     tx.execute(
-        "INSERT INTO characters (name, description, traits, image_path, notes)
-         VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO characters (project_id, name, description, traits, image_path, notes, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now'), datetime('now'))",
         params![
+            project_id,
             dto.name.trim(),
             dto.description,
             dto.traits,
@@ -187,6 +227,7 @@ pub async fn create_character(
 
     tx.commit().map_err(|e| AppError::Database(e.to_string()))?;
 
+    let _ = sync_project_json(&conn, project_id, &state.data_dir);
     let character = get_character_by_id(&conn, char_id, true)?;
     Ok((StatusCode::CREATED, Json(character)))
 }
@@ -208,7 +249,8 @@ pub async fn update_character(
     Json(dto): Json<UpdateCharacterDto>,
 ) -> Result<impl IntoResponse, AppError> {
     let mut conn = state.pool.get().map_err(|e| AppError::Database(e.to_string()))?;
-    let _existing = get_character_by_id(&conn, id, false)?;
+    let existing = get_character_by_id(&conn, id, false)?;
+    let project_id = existing.project_id.unwrap_or(1);
 
     let tx = conn.transaction().map_err(|e| AppError::Database(e.to_string()))?;
 
@@ -216,27 +258,32 @@ pub async fn update_character(
         if name.trim().is_empty() {
             return Err(AppError::BadRequest("Character name cannot be empty".into()));
         }
-        tx.execute("UPDATE characters SET name = ?1 WHERE id = ?2", params![name.trim(), id])
+        tx.execute("UPDATE characters SET name = ?1, updated_at = datetime('now') WHERE id = ?2", params![name.trim(), id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
     if dto.description.is_some() {
-        tx.execute("UPDATE characters SET description = ?1 WHERE id = ?2", params![dto.description, id])
+        tx.execute("UPDATE characters SET description = ?1, updated_at = datetime('now') WHERE id = ?2", params![dto.description, id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
     if dto.traits.is_some() {
-        tx.execute("UPDATE characters SET traits = ?1 WHERE id = ?2", params![dto.traits, id])
+        tx.execute("UPDATE characters SET traits = ?1, updated_at = datetime('now') WHERE id = ?2", params![dto.traits, id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
     if dto.image_path.is_some() {
-        tx.execute("UPDATE characters SET image_path = ?1 WHERE id = ?2", params![dto.image_path, id])
+        tx.execute("UPDATE characters SET image_path = ?1, updated_at = datetime('now') WHERE id = ?2", params![dto.image_path, id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
     if dto.notes.is_some() {
-        tx.execute("UPDATE characters SET notes = ?1 WHERE id = ?2", params![dto.notes, id])
+        tx.execute("UPDATE characters SET notes = ?1, updated_at = datetime('now') WHERE id = ?2", params![dto.notes, id])
+            .map_err(|e| AppError::Database(e.to_string()))?;
+    }
+
+    if let Some(new_pid) = dto.project_id {
+        tx.execute("UPDATE characters SET project_id = ?1, updated_at = datetime('now') WHERE id = ?2", params![new_pid, id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
@@ -247,6 +294,7 @@ pub async fn update_character(
 
     tx.commit().map_err(|e| AppError::Database(e.to_string()))?;
 
+    let _ = sync_project_json(&conn, project_id, &state.data_dir);
     let character = get_character_by_id(&conn, id, true)?;
     Ok(Json(character))
 }
@@ -257,7 +305,7 @@ pub async fn delete_character(
     Path(id): Path<i64>,
 ) -> Result<impl IntoResponse, AppError> {
     let conn = state.pool.get().map_err(|e| AppError::Database(e.to_string()))?;
-    let _character = get_character_by_id(&conn, id, false)?;
+    let character = get_character_by_id(&conn, id, false)?;
 
     conn.execute("DELETE FROM characters WHERE id = ?1", params![id])
         .map_err(|e| AppError::Database(e.to_string()))?;
@@ -274,6 +322,10 @@ pub async fn delete_character(
     )
     .ok();
 
+    if let Some(pid) = character.project_id {
+        let _ = sync_project_json(&conn, pid, &state.data_dir);
+    }
+
     Ok(Json(json!({
         "status": "success",
         "id": id
@@ -283,7 +335,7 @@ pub async fn delete_character(
 pub fn get_character_by_id(conn: &Connection, id: i64, include_prompts: bool) -> Result<Character, AppError> {
     let mut stmt = conn
         .prepare(
-            "SELECT id, name, description, traits, image_path, notes, created_at
+            "SELECT id, name, description, traits, image_path, notes, project_id, created_at, updated_at
              FROM characters
              WHERE id = ?1",
         )

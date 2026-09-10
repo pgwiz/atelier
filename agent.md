@@ -32,12 +32,14 @@ atelier/
     db.rs                # connection pool initialization & idempotent schema migrations
     models.rs            # structs for Prompt, Character, Link, Tag, Board, BoardItem, SearchResult
     handlers/
-      prompts.rs         # CRUD handlers for /api/prompts
-      characters.rs      # CRUD handlers for /api/characters
-      links.rs           # CRUD handlers for /api/links (+ YouTube oEmbed metadata fetch)
+      projects.rs        # CRUD for /api/projects, copy, merge, visual transfer, single-project export/import
+      parts.rs           # CRUD for /api/projects/:id/parts, status toggles, linked entity associations
+      prompts.rs         # CRUD handlers for /api/prompts (scoped by project_id)
+      characters.rs      # CRUD handlers for /api/characters (scoped by project_id)
+      links.rs           # CRUD handlers for /api/links (scoped by project_id)
       tags.rs            # tag management, autocomplete, polymorphic tagging
-      search.rs          # unified multi-entity search: GET /api/search?q=&tag=&favorite=
-      boards.rs          # CRUD handlers for boards, board items, camera, and drawing data
+      search.rs          # unified multi-entity search: GET /api/search?q=&tag=&favorite=&project_id=
+      boards.rs          # CRUD handlers for boards, board items (including mini parts), camera, and drawing data
       backup.rs          # /api/export and /api/import full database backup & restore
       upload.rs          # /api/upload for local image uploads (saved to data/uploads/)
   static/
@@ -63,18 +65,84 @@ Run this as an idempotent startup migration in `src/db.rs`:
 ```sql
 PRAGMA foreign_keys = ON;
 
+-- Projects: top-level workspace container with status and timestamps
+CREATE TABLE IF NOT EXISTS projects (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  description TEXT,
+  status TEXT NOT NULL DEFAULT 'Planning', -- 'Idea' | 'Planning' | 'In Progress' | 'Review' | 'Completed' | 'Archived'
+  color TEXT NOT NULL DEFAULT '#38bdf8',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Seed default studio project if table is empty
+INSERT OR IGNORE INTO projects (id, name, description, status) 
+VALUES (1, 'Default Studio', 'Default workspace project', 'In Progress');
+
+-- Project Parts: ordered scenes / chapters / segments for video/content production
+CREATE TABLE IF NOT EXISTS project_parts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  part_type TEXT NOT NULL DEFAULT 'scene', -- 'scene' | 'chapter' | 'segment' | 'stage'
+  status TEXT NOT NULL DEFAULT 'Draft',    -- 'Draft' | 'In Progress' | 'Ready' | 'Done'
+  order_index INTEGER NOT NULL DEFAULT 0,
+  description TEXT,
+  notes TEXT,
+  board_id INTEGER REFERENCES boards(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  completed_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_parts_project ON project_parts(project_id);
+
+-- Part Entities: Many-to-many associations linking parts to characters, prompts, and links
+CREATE TABLE IF NOT EXISTS part_entities (
+  part_id INTEGER NOT NULL REFERENCES project_parts(id) ON DELETE CASCADE,
+  entity_type TEXT NOT NULL, -- 'character' | 'prompt' | 'link'
+  entity_id INTEGER NOT NULL,
+  PRIMARY KEY (part_id, entity_type, entity_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_part_entities ON part_entities(part_id, entity_type);
+
+-- Project & Part Attachments (Custom Addons: Audio, Documents, Scripts, Media)
+CREATE TABLE IF NOT EXISTS project_attachments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  part_id INTEGER REFERENCES project_parts(id) ON DELETE CASCADE, -- null if project-level
+  name TEXT NOT NULL,
+  addon_type TEXT NOT NULL, -- 'audio' | 'document' | 'image' | 'video' | 'custom'
+  file_path TEXT NOT NULL,  -- relative path inside project folder: e.g. "audio/scene1_vo.mp3"
+  file_size INTEGER,
+  mime_type TEXT,
+  notes TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_attachments_project ON project_attachments(project_id);
+CREATE INDEX IF NOT EXISTS idx_attachments_part ON project_attachments(part_id);
+
 CREATE TABLE IF NOT EXISTS characters (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL DEFAULT 1 REFERENCES projects(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
   traits TEXT,
   image_path TEXT,
   notes TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE INDEX IF NOT EXISTS idx_characters_project ON characters(project_id);
 
 CREATE TABLE IF NOT EXISTS prompts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL DEFAULT 1 REFERENCES projects(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   body TEXT NOT NULL,
   system_prompt TEXT,
@@ -84,25 +152,32 @@ CREATE TABLE IF NOT EXISTS prompts (
   notes TEXT,
   is_favorite INTEGER NOT NULL DEFAULT 0,
   character_id INTEGER REFERENCES characters(id) ON DELETE SET NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE INDEX IF NOT EXISTS idx_prompts_project ON prompts(project_id);
 
 CREATE TABLE IF NOT EXISTS links (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL DEFAULT 1 REFERENCES projects(id) ON DELETE CASCADE,
   url TEXT NOT NULL,
   platform TEXT,
   title TEXT,
   description TEXT,
   thumbnail_url TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE INDEX IF NOT EXISTS idx_links_project ON links(project_id);
 
 CREATE TABLE IF NOT EXISTS tags (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL UNIQUE
 );
 
--- Polymorphic tag associations: entity_type is 'prompt' | 'character' | 'link'
+-- Polymorphic tag associations: entity_type is 'prompt' | 'character' | 'link' | 'part'
 CREATE TABLE IF NOT EXISTS taggables (
   tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
   entity_type TEXT NOT NULL,
@@ -115,6 +190,7 @@ CREATE INDEX IF NOT EXISTS idx_taggables_entity ON taggables(entity_type, entity
 -- Visual planning boards
 CREATE TABLE IF NOT EXISTS boards (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL DEFAULT 1 REFERENCES projects(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   theme TEXT NOT NULL DEFAULT 'default',
   canvas_style TEXT NOT NULL DEFAULT 'dot-grid', -- 'dot-grid' | 'corkboard' | 'graph' | 'blank'
@@ -122,14 +198,17 @@ CREATE TABLE IF NOT EXISTS boards (
   pan_y REAL NOT NULL DEFAULT 0,
   zoom REAL NOT NULL DEFAULT 1.0,
   drawing_data TEXT NOT NULL DEFAULT '[]',       -- JSON vector blob: strokes, shapes, connectors, text
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- Draggable cards on a board
+CREATE INDEX IF NOT EXISTS idx_boards_project ON boards(project_id);
+
+-- Draggable cards on a board (including interactive mini parts)
 CREATE TABLE IF NOT EXISTS board_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   board_id INTEGER NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
-  entity_type TEXT NOT NULL,                    -- 'prompt' | 'character' | 'link' | 'note'
+  entity_type TEXT NOT NULL,                    -- 'prompt' | 'character' | 'link' | 'note' | 'part'
   entity_id INTEGER,                             -- null when entity_type = 'note'
   note_text TEXT,                                 -- content for freeform sticky notes
   pos_x REAL NOT NULL DEFAULT 0,
@@ -148,9 +227,46 @@ CREATE INDEX IF NOT EXISTS idx_board_items_board ON board_items(board_id);
 
 ## API Surface
 
-### Prompts
-- `GET /api/prompts` — list prompts (optional filter by `character_id`, `category`, `favorite`)
-- `POST /api/prompts` — create prompt `{title, body, system_prompt?, parameters?, model_used?, category?, notes?, character_id?, tags?}`
+### Projects & Dual Storage Architecture
+- **Central Relational DB**: `data/atelier.db` manages unified connection pooling, indexing, and cross-project operations.
+- **Dedicated Project Folders**: `data/projects/<id>/` contains auto-synced `project.json` manifest plus media subdirectories (`audio/`, `documents/`, `images/`, `videos/`, `exports/`).
+- `GET /api/projects` — list all projects with counts (`prompts_count`, `characters_count`, `links_count`, `boards_count`, `parts_count`, `progress_percent`) and timestamps
+- `POST /api/projects` — create project `{name, description?, status?, color?}` (creates folder & initial `project.json`)
+- `GET /api/projects/:id` — get single project with full statistics, progress calculation, and timestamps
+- `PUT /api/projects/:id` — update project `{name?, description?, status?, color?}` (updates `updated_at` & syncs `project.json`)
+- `DELETE /api/projects/:id` — delete project, its cascaded contents, and project directory
+- `POST /api/projects/:id/copy` — deep copy project `{new_name?}` with duplicate entity records, new folder, and fresh timestamps
+- `POST /api/projects/:id/merge` — merge another project into this one `{source_project_id, keep_source?: bool}` (non-destructive name suffixing)
+- `POST /api/projects/transfer` — visual transfer items `{source_project_id, target_project_id, items: [{entity_type, entity_id}], action: "move" | "copy"}`
+- `POST /api/projects/:id/reload-json` — reconcile `data/projects/<id>/project.json` edits or restored files from disk back into database
+- `GET /api/projects/:id/export` — export single project package as portable JSON or `.zip` (with associated uploaded media)
+- `POST /api/projects/import` — import standalone project package into Atelier
+
+### Project Parts (Production Scenes & Stages)
+- `GET /api/projects/:id/parts` — list all ordered parts for a project with linked characters, prompts, and references
+- `POST /api/projects/:id/parts` — create part `{title, part_type?, status?, description?, notes?, board_id?, linked_character_ids?, linked_prompt_ids?, linked_link_ids?}`
+- `GET /api/parts/:id` — get single part with full linked entity payloads and timestamps
+- `PUT /api/parts/:id` — update part fields (sets `completed_at` when status transitions to 'Done')
+- `PATCH /api/parts/:id/status` — quick update status `{status: "Draft" | "In Progress" | "Ready" | "Done"}`
+- `POST /api/projects/:id/parts/reorder` — reorder parts `{part_ids: [1, 3, 2]}`
+- `DELETE /api/parts/:id` — delete part
+- `POST /api/parts/:id/entities` — attach linked entity `{entity_type, entity_id}`
+- `DELETE /api/parts/:id/entities/:entity_type/:entity_id` — detach linked entity
+
+### Custom Addons & Attachments (Audio, Documents, Scripts, Media)
+- `GET /api/projects/:id/attachments` — list project-level and part-level attachments
+- `POST /api/projects/:id/attachments` — upload/create attachment multipart `{file, name, addon_type, part_id?, notes?}`
+- `GET /api/attachments/:id` — get attachment details, permalink, and metadata
+- `DELETE /api/attachments/:id` — delete attachment record and remove local file
+- `GET /files/projects/:id/*` — stream raw attachment file (audio, PDF, markdown script, video) for in-app player/viewer
+
+### Filesystem Explorer Integration & Permalinks
+- `POST /api/fs/reveal` — reveal file/folder in native OS File Explorer `{path: string}` (Windows Explorer /select, macOS open -R)
+- `POST /api/projects/:id/open-folder` — open project's root folder in native OS File Explorer
+
+### Prompts (Scoped to Project)
+- `GET /api/prompts` — list prompts (filter by `project_id`, `character_id`, `category`, `favorite`)
+- `POST /api/prompts` — create prompt `{project_id?, title, body, system_prompt?, parameters?, model_used?, category?, notes?, character_id?, tags?}`
 - `GET /api/prompts/:id` — get single prompt with associated character details and tags
 - `PUT /api/prompts/:id` — update prompt fields
 - `DELETE /api/prompts/:id` — delete prompt
@@ -274,17 +390,80 @@ The board uses an SVG container and an HTML cards container stacked inside a mas
 
 ---
 
+---
+
+## Projects, Production Parts & Visual Transfer Architecture
+
+### 1. Projects-First Workspace Hierarchy
+- **Projects Dashboard**: The root landing view is the **Projects Dashboard**, displaying visual cards for each project with its status badge, progress percentage bar (calculated automatically from completed parts), item counts (`prompts`, `characters`, `links`, `boards`, `parts`), and timestamps (`created_at`, `updated_at`).
+- **Sidebar Project Switcher**:
+  - **Expanded Mode**: Located directly below the brand header. Displays active project icon, project name, color dot, status badge (`Idea`, `Planning`, `In Progress`, `Review`, `Completed`, `Archived`), and a dropdown caret. Clicking opens a dropdown with:
+    - Current project stat chips: `Prompts (X) • Characters (Y) • References (Z) • Boards (W) • Parts (V)`
+    - Fast project switcher list
+    - Action buttons: `+ New Project`, `Duplicate Project`, `Merge Projects`, `Visual Transfer`, `Projects Dashboard`
+  - **Compressed Mode**: Collapses into a centered 36x36px project icon button with a colored status dot indicator. Clicking opens the quick-switch popup menu.
+
+### 2. Flexible Production Parts (Scenes / Chapters / Segments)
+- **Concept**: A project is broken down into an ordered sequence of production parts (e.g., *Intro*, *Scene 1: Chase*, *Scene 2: Alley*, *Voiceover*).
+- **Statuses**: `Draft`, `In Progress`, `Ready`, `Done`. When marked `Done`, `completed_at` timestamp is set automatically.
+- **Many-to-Many Linking**: Each Part links to:
+  - Cast (`characters` appearing in the scene)
+  - Generation Prompts (`prompts` used for script/video/image cues)
+  - Moodboard References (`links` for audio/visual inspiration)
+  - Planning Board (`boards` associated with the part)
+- **Board Mini Parts**:
+  - Parts can be dragged onto any planning board as interactive `board_items` with `entity_type: 'part'`.
+  - Shows part title, clickable status badge to update progress directly, linked character mini avatars, and connection anchors to draw sequence arrows between scenes or characters.
+
+### 3. Project Operations & Visual Transfer
+- **Duplicate / Copy Project**: Deep-clones the project, parts, prompts, characters, links, boards, board items, and vector drawings into a new project with fresh timestamps while preserving internal linkages.
+- **Merge Projects**: Merges Project A into Project B non-destructively. If character or board names collide, automatically appends suffix (e.g., `Neo (Project A)`), updates target project's `updated_at`, with option to keep or archive the source project.
+- **Visual Transfer Workbench**: A visual dual-pane transfer modal (Source project on left, Target project on right) allowing selective moving or copying of prompts, characters, links, boards, and parts, with live timestamp updates and individual entity card transfer buttons.
+### 4. Custom Addons, File Attachments & Media Viewers
+- **Concept**: Beyond standard prompts and characters, projects and individual parts can have custom addons/attachments (voiceovers, audio cues, screenplays, PDF bibles, video animatics).
+- **Supported Formats & In-App Players**:
+  - **Audio** (`.mp3`, `.wav`, `.ogg`, `.m4a`): Built-in audio player with waveform/timeline seek, volume, and playback speed toggles (0.75x, 1.0x, 1.25x, 1.5x, 2.0x).
+  - **Scripts & Documents** (`.txt`, `.md`, `.fountain`, `.pdf`): In-app document viewer with formatted text preview, script reader, and PDF iframe embed.
+  - **Video & Motion** (`.mp4`, `.webm`): In-app video preview player.
+- **Attachment Cards**: Rendered with file metadata (size, format icon, timestamp), inline preview, quick delete, and "Open File Location" button.
+
+### 5. Dedicated Filesystem Organization & Native Explorer Reveal
+- **Project Directory Structure**: Each project gets a clean folder under `data/projects/<project_id>/` with subfolders:
+  - `audio/` (voiceover recordings, audio cues, sound effects)
+  - `documents/` (scripts, screenplays, PDF notes, fountain docs)
+  - `images/` (character portraits, reference images, moodboards)
+  - `videos/` (video clips, animatics, scene renders)
+  - `exports/` (board exports, single project archives)
+- **Native OS 'Open File Location' / 'Reveal in Explorer'**:
+  - When clicking "Open Project Folder" or "Open File Location" on any attached file:
+  - Backend executes path-traversal validated command:
+    - **Windows**: `explorer.exe /select,"<canonical_file_path>"` (highlights file) or `explorer.exe "<canonical_dir_path>"`
+    - **macOS**: `open -R "<path>"`
+    - **Linux**: `xdg-open "<dir>"`
+  - Immediately reveals the folder or file in the user's desktop file manager.
+
+### 6. Deep-Linking Permalinks
+- **SPA Entity Routing**: Direct permalinks support jumping straight to items:
+  - Project Dashboard: `http://localhost:8080/#/projects/:id`
+  - Part Detail / Timeline: `http://localhost:8080/#/projects/:id/parts/:part_id`
+  - Board Focus: `http://localhost:8080/#/projects/:id/boards/:board_id`
+  - Prompts & Characters: `http://localhost:8080/#/projects/:id/prompts/:prompt_id`
+- **Raw File Permalinks**: Streaming endpoints (`/files/projects/:id/*`) for browser tabs and media players.
+- **Copy Permalink**: 1-click clipboard copy button on entity cards and modals with toast confirmation.
+
+---
+
 ## Comprehensive Implementation Task List
 
 ### Phase 1: Project Setup & Core Infrastructure
-- [ ] **1.1** Initialize Cargo project structure with `Cargo.toml` and `.gitignore`
-- [ ] **1.2** Configure Rust dependencies (`axum`, `tokio`, `rusqlite`, `r2d2`, `r2d2_sqlite`, `serde`, `serde_json`, `zip`, `tower-http`, `reqwest`, `uuid`, `tracing`)
-- [ ] **1.3** Establish directory skeleton (`src/handlers/`, `static/`, `data/uploads/`)
-- [ ] **1.4** Implement `src/main.rs`: `AppState` (db pool + paths), centralized `AppError` enum with HTTP status mapping, graceful shutdown, and static routes (`/`, `/uploads`)
+- [x] **1.1** Initialize Cargo project structure with `Cargo.toml` and `.gitignore`
+- [x] **1.2** Configure Rust dependencies (`axum`, `tokio`, `rusqlite`, `r2d2`, `r2d2_sqlite`, `serde`, `serde_json`, `zip`, `tower-http`, `reqwest`, `uuid`, `tracing`)
+- [x] **1.3** Establish directory skeleton (`src/handlers/`, `static/`, `data/uploads/`)
+- [x] **1.4** Implement `src/main.rs`: `AppState` (db pool + paths), centralized `AppError` enum with HTTP status mapping, graceful shutdown, and static routes (`/`, `/uploads`)
 
 ### Phase 2: Database Architecture & Migrations
-- [ ] **2.1** Implement `src/db.rs` with `r2d2` pool creation, WAL journal mode, and foreign keys pragma
-- [ ] **2.2** Implement idempotent schema migration function on startup creating:
+- [x] **2.1** Implement `src/db.rs` with `r2d2` pool creation, WAL journal mode, and foreign keys pragma
+- [x] **2.2** Implement idempotent schema migration function on startup creating:
   - `characters`
   - `prompts` (with `system_prompt` and `parameters` JSON)
   - `links`
@@ -294,7 +473,7 @@ The board uses an SVG container and an HTML cards container stacked inside a mas
   - `board_items` (cards and sticky notes)
 
 ### Phase 3: Domain Models & Data Transfer Objects
-- [ ] **3.1** Implement `src/models.rs` with Serde-serializable structs:
+- [x] **3.1** Implement `src/models.rs` with Serde-serializable structs:
   - `Prompt`, `CreatePromptDto`, `UpdatePromptDto`
   - `Character`, `CreateCharacterDto`, `UpdateCharacterDto`
   - `Link`, `CreateLinkDto`, `UpdateLinkDto`
@@ -305,49 +484,81 @@ The board uses an SVG container and an HTML cards container stacked inside a mas
   - `BackupManifest`
 
 ### Phase 4: API Handlers
-- [ ] **4.1** `src/handlers/prompts.rs`: List (with character/category/tag filters), Create, Get, Update, Delete, Favorite toggle
-- [ ] **4.2** `src/handlers/characters.rs`: List, Create, Get (with linked prompts), Update, Delete
-- [ ] **4.3** `src/handlers/links.rs`: List, Create with async YouTube oEmbed metadata lookup, Get, Update, Delete
-- [ ] **4.4** `src/handlers/tags.rs`: List with counts, attach to entity, detach from entity
-- [ ] **4.5** `src/handlers/search.rs`: Multi-entity parameterized SQL search across prompts, characters, and links
-- [ ] **4.6** `src/handlers/boards.rs`:
+- [x] **4.1** `src/handlers/prompts.rs`: List (with character/category/tag filters), Create, Get, Update, Delete, Favorite toggle
+- [x] **4.2** `src/handlers/characters.rs`: List, Create, Get (with linked prompts), Update, Delete
+- [x] **4.3** `src/handlers/links.rs`: List, Create with async YouTube oEmbed metadata lookup, Get, Update, Delete
+- [x] **4.4** `src/handlers/tags.rs`: List with counts, attach to entity, detach from entity
+- [x] **4.5** `src/handlers/search.rs`: Multi-entity parameterized SQL search across prompts, characters, and links
+- [x] **4.6** `src/handlers/boards.rs`:
   - Board CRUD & camera state updates (`pan_x`, `pan_y`, `zoom`)
   - Debounced drawing vector data updates (`PATCH /api/boards/:id/drawing`)
   - Board items CRUD (add card/note, patch position/dimensions, delete item)
-- [ ] **4.7** `src/handlers/upload.rs`: Multipart image upload saving to `data/uploads/` with UUID and returning relative URL
-- [ ] **4.8** `src/handlers/backup.rs`:
+- [x] **4.7** `src/handlers/upload.rs`: Multipart image upload saving to `data/uploads/` with UUID and returning relative URL
+- [x] **4.8** `src/handlers/backup.rs`:
   - JSON text export & transactional import (`/api/export`, `/api/import`)
   - Full `.zip` archive export streaming (`atelier.db`, `database.json`, `manifest.json`, `data/uploads/`)
   - Full `.zip` archive upload and atomic restore with validation and rollback
   - Single board JSON export (`/api/boards/:id/export`)
 
 ### Phase 5: Frontend Design System & Shell
-- [ ] **5.1** `static/index.html`: Responsive single-page structure with collapsible left sidebar, view containers, and modal popups
-- [ ] **5.2** `static/style.css`: Design token definitions for 5 global themes (`dark`, `light`, `sepia`, `pastel`, `cyberpunk`) and 4 canvas styles (`dot-grid`, `corkboard`, `graph`, `blank`)
-- [ ] **5.3** `static/app.js`: Core client architecture: SPA view switcher, active state management, theme switcher, notifications/toasts, and API fetch wrappers
+- [x] **5.1** `static/index.html`: Responsive single-page structure with collapsible left sidebar, view containers, and modal popups
+- [x] **5.2** `static/style.css`: Design token definitions for 5 global themes (`dark`, `light`, `sepia`, `pastel`, `cyberpunk`) and 4 canvas styles (`dot-grid`, `corkboard`, `graph`, `blank`)
+- [x] **5.3** `static/app.js`: Core client architecture: SPA view switcher, active state management, theme switcher, notifications/toasts, and API fetch wrappers
 
 ### Phase 6: Core Content Views (Prompts, Characters, Links, Search)
-- [ ] **6.1** Prompts view: Grid of prompt cards, quick copy-to-clipboard, filter by favorite/character, prompt modal (with system prompt and parameters fields)
-- [ ] **6.2** Characters view: Character roster gallery, avatar display, trait badges, image upload/drag-drop, linked prompt list
-- [ ] **6.3** Links view: Reference bookmark cards with YouTube oEmbed title/thumbnail previews, platform tags, external link launcher
-- [ ] **6.4** Search & Tag Cloud: Instant search bar, tag filtering chips, multi-entity result list with type indicators
+- [x] **6.1** Prompts view: Grid of prompt cards, quick copy-to-clipboard, filter by favorite/character, prompt modal (with system prompt and parameters fields)
+- [x] **6.2** Characters view: Character roster gallery, avatar display, trait badges, image upload/drag-drop, linked prompt list
+- [x] **6.3** Links view: Reference bookmark cards with YouTube oEmbed title/thumbnail previews, platform tags, external link launcher
+- [x] **6.4** Search & Tag Cloud: Instant search bar, tag filtering chips, multi-entity result list with type indicators
 
 ### Phase 7: Hybrid Corkboard & Vector Diagramming Canvas
-- [ ] **7.1** `static/canvas.js`: Unified SVG vector container and HTML cards container sharing `translate(pan_x, pan_y) scale(zoom)`
-- [ ] **7.2** Camera navigation: Space+Drag / Middle-click pan, Ctrl+Wheel zoom, on-screen zoom toolbar (+, -, 100%, Fit All)
-- [ ] **7.3** Card interactions: Absolute world coordinates, pointer events for smooth dragging, resize handle, card delete
-- [ ] **7.4** Sticky notes: Color picker, inline text editing, resize handling
-- [ ] **7.5** Vector drawing tools:
+- [x] **7.1** `static/canvas.js`: Unified SVG vector container and HTML cards container sharing `translate(pan_x, pan_y) scale(zoom)`
+- [x] **7.2** Camera navigation: Space+Drag / Middle-click pan, Ctrl+Wheel zoom, on-screen zoom toolbar (+, -, 100%, Fit All)
+- [x] **7.3** Card interactions: Absolute world coordinates, pointer events for smooth dragging, resize handle, card delete
+- [x] **7.4** Sticky notes: Color picker, inline text editing, resize handling
+- [x] **7.5** Vector drawing tools:
   - Freehand Pen (`P`) with SVG path generation, stroke width, and color palette
   - Geometric shapes: Rectangles (`R`) and Ellipses (`O`)
   - Smart Snapping Connectors (`C`): Dynamic SVG arrow paths linking cards that update live on card movement
   - Floating Text labels (`T`)
-- [ ] **7.6** Canvas controls & history: Multi-level Undo / Redo (`Ctrl+Z`, `Ctrl+Y`), Delete key support, tool hotkeys
-- [ ] **7.7** In-canvas resource drawer: Slide-out drawer to search and drag prompts, characters, and links onto the board
-- [ ] **7.8** Debounced synchronization: Autosave camera, item coordinates, and vector drawings to SQLite
+- [x] **7.6** Canvas controls & history: Multi-level Undo / Redo (`Ctrl+Z`, `Ctrl+Y`), Delete key support, tool hotkeys
+- [x] **7.7** In-canvas resource drawer: Slide-out drawer to search and drag prompts, characters, and links onto the board
+- [x] **7.8** Debounced synchronization: Autosave camera, item coordinates, and vector drawings to SQLite
 
 ### Phase 8: Backup, Portability & Verification
-- [ ] **8.1** Connect UI controls for JSON Export/Import and Full `.zip` Archive Export/Restore
-- [ ] **8.2** Build test suite in `tests/api_tests.rs` verifying prompt CRUD, tagging, board items, and backup round-trip
-- [ ] **8.3** Comprehensive end-to-end verification of all user workflows in browser
+- [x] **8.1** Connect UI controls for JSON Export/Import and Full `.zip` Archive Export/Restore
+- [x] **8.2** Build test suite in `tests/api_tests.rs` verifying prompt CRUD, tagging, board items, and backup round-trip
+- [x] **8.3** Comprehensive end-to-end verification of all user workflows in browser
+
+### Phase 9: Projects, Production Parts & Multi-Workspace Operations
+- [ ] **9.1 Database Schema Migration & Storage Architecture**:
+  - Add `projects` table (seeded with 'Default Studio'), `project_parts` table, `part_entities` junction table, and `project_attachments` table.
+  - Add `project_id` and `updated_at` to `prompts`, `characters`, `links`, `boards`.
+  - Add `completed_at` to `project_parts` and support `entity_type: 'part'` in `board_items`.
+  - Implement dual storage generator: auto-create `data/projects/<id>/{audio,documents,images,videos,exports}` and maintain auto-synced `project.json` manifest.
+- [ ] **9.2 Backend Models & Handlers**:
+  - Implement `src/handlers/projects.rs`: CRUD, statistics aggregation (`GET /api/projects`), duplicate/copy (`POST /api/projects/:id/copy`), non-destructive merge (`POST /api/projects/:id/merge`), visual transfer (`POST /api/projects/transfer`), reload from disk (`POST /api/projects/:id/reload-json`), single-project export (`GET /api/projects/:id/export`), and project import (`POST /api/projects/import`).
+  - Implement `src/handlers/parts.rs`: CRUD for parts (`GET/POST /api/projects/:id/parts`, `PUT/DELETE /api/parts/:id`), quick status toggle (`PATCH /api/parts/:id/status`), reordering (`POST /api/projects/:id/parts/reorder`), and linked entity attachment (`POST/DELETE /api/parts/:id/entities`).
+  - Implement `src/handlers/attachments.rs`: Upload and management for custom addons (audio, documents, scripts, media), with raw file streaming at `/files/projects/:id/*`.
+  - Implement `src/handlers/filesystem.rs`: Path-traversal safe native OS File Explorer invocation (`POST /api/fs/reveal` and `POST /api/projects/:id/open-folder`).
+  - Update `prompts.rs`, `characters.rs`, `links.rs`, `boards.rs`, `search.rs` to filter by `project_id`.
+- [ ] **9.3 Frontend Projects Dashboard & Sidebar Switcher**:
+  - Dedicated Project Switcher in sidebar directly below header: active project pill with name, status badge, dropdown with stat chips and action buttons; shrinks to 36x36px icon with colored status dot in compressed navbar.
+  - Central Projects Dashboard view with project cards, progress bars, entity counts, timestamps, "Open Project Folder", and quick action buttons.
+- [ ] **9.4 Production Parts View & Custom Addon Viewers**:
+  - Dedicated Parts / Scene timeline view with status badges, linked characters/prompts/references chips, drag-and-drop reordering, and create/edit modal.
+  - Custom Addon panel: Audio player with playback speed controls (`.mp3`, `.wav`), Document/script viewer (`.txt`, `.md`, `.fountain`, `.pdf` iframe), and Video player (`.mp4`, `.webm`).
+  - "Open File Location" button on each attachment card.
+- [ ] **9.5 Canvas Mini Parts Integration**:
+  - Render interactive 'part' cards on the planning canvas showing part title, clickable status badge, linked character avatars, and connection anchors for sequence arrows.
+  - Include Parts in canvas resource drawer.
+- [ ] **9.6 Visual Transfer Workbench & Merge Dialog**:
+  - Dual-pane transfer modal (Source vs Target) with item checkboxes to Move or Copy across projects.
+  - Merge project dialog with conflict handling (suffixing duplicate names) and source project retention toggle.
+- [ ] **9.7 Deep-Linking Permalinks & Navigation**:
+  - Hash-based deep link router (`/#/projects/:id`, `/#/projects/:id/parts/:part_id`, `/#/projects/:id/boards/:board_id`).
+  - "Copy Permalink" action button with clipboard confirmation.
+- [ ] **9.8 Test Suite & Verification**:
+  - Integration tests covering project creation, copy, merge, visual transfer, parts management, custom addon uploads, and single-project export/import.
+
 

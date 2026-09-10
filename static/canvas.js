@@ -621,7 +621,12 @@ class AtelierCanvas {
     const typeBadge = document.createElement('span');
     typeBadge.className = 'board-card-type-badge';
     const cIcon = document.createElement('i');
-    cIcon.className = `fa-solid ${item.entity_type === 'prompt' ? 'fa-feather-pointed' : item.entity_type === 'character' ? 'fa-user' : item.entity_type === 'link' ? 'fa-link' : 'fa-note-sticky'}`;
+    let iconClass = 'fa-note-sticky';
+    if (item.entity_type === 'prompt') iconClass = 'fa-feather-pointed';
+    else if (item.entity_type === 'character') iconClass = 'fa-users';
+    else if (item.entity_type === 'link') iconClass = 'fa-link';
+    else if (item.entity_type === 'part') iconClass = 'fa-film';
+    cIcon.className = `fa-solid ${iconClass}`;
     typeBadge.appendChild(cIcon);
     typeBadge.appendChild(document.createTextNode(` ${item.entity_type}`));
     header.appendChild(typeBadge);
@@ -664,10 +669,57 @@ class AtelierCanvas {
         img.loading = 'lazy';
         body.appendChild(img);
       }
+      let pSubtitle = null;
       if (item.entity_subtitle) {
-        const p = document.createElement('p');
-        p.textContent = item.entity_subtitle;
-        body.appendChild(p);
+        pSubtitle = document.createElement('p');
+        pSubtitle.textContent = item.entity_subtitle;
+        body.appendChild(pSubtitle);
+      }
+      if (item.entity_type === 'part' && item.entity_id) {
+        const statusPill = document.createElement('button');
+        statusPill.type = 'button';
+        let currentStatus = 'Draft';
+        if (item.entity_subtitle && item.entity_subtitle.includes('\u2022')) {
+          currentStatus = item.entity_subtitle.split('\u2022')[1].trim();
+        }
+        const statusSlug = currentStatus.toLowerCase().replace(/\s+/g, '-');
+        statusPill.className = `part-status-badge badge-status-${statusSlug}`;
+        statusPill.innerHTML = `<i class="fa-solid fa-circle-dot"></i> ${currentStatus}`;
+        statusPill.title = 'Click to cycle status (Draft -> In Progress -> Ready -> Done)';
+        statusPill.addEventListener('pointerdown', (e) => e.stopPropagation());
+        statusPill.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const cycle = ['Draft', 'In Progress', 'Ready', 'Done'];
+          const idx = cycle.indexOf(currentStatus);
+          const nextStatus = cycle[(idx + 1) % cycle.length];
+          try {
+            const res = await fetch(`/api/parts/${item.entity_id}/status`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: nextStatus })
+            });
+            if (res.ok) {
+              currentStatus = nextStatus;
+              const nextSlug = nextStatus.toLowerCase().replace(/\s+/g, '-');
+              statusPill.className = `part-status-badge badge-status-${nextSlug}`;
+              statusPill.innerHTML = `<i class="fa-solid fa-circle-dot"></i> ${nextStatus}`;
+              if (item.entity_subtitle && pSubtitle) {
+                const parts = item.entity_subtitle.split('\u2022');
+                item.entity_subtitle = `${parts[0].trim()} \u2022 ${nextStatus}`;
+                pSubtitle.textContent = item.entity_subtitle;
+              }
+              if (typeof showToast === 'function') {
+                showToast(`Part updated to ${nextStatus}`);
+              }
+              if (typeof refreshActiveProjectProgress === 'function') {
+                refreshActiveProjectProgress();
+              }
+            }
+          } catch (err) {
+            console.error('Failed to cycle part status', err);
+          }
+        });
+        body.appendChild(statusPill);
       }
       if (item.entity_tags && item.entity_tags.length > 0) {
         const tagsWrap = document.createElement('div');

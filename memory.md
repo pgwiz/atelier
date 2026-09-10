@@ -27,9 +27,14 @@ Atelier is a local-only, single-user content sketchbook and visual planning canv
     - SVG layer for drawings, shapes, floating text, and dynamic connectors.
     - HTML layer for draggable/resizable cards (Prompts, Characters, Links, Sticky Notes).
     - Smart snapping connectors dynamically track card anchors and recalculate paths on card movement.
-    - Multi-level Undo/Redo stack for vector elements.
-    - Autosave with debounced writes to SQLite.
-    - Slide-out resource drawer to pin items directly to the canvas.
+- **Phase 9: Projects-First Creative OS & Dual Storage**:
+  - Central relational DB (`data/atelier.db`) handles indexing, pooling, and cross-project operations.
+  - Dedicated project directories (`data/projects/<id>/`) contain an auto-synced, human-readable `project.json` snapshot plus media directories (`audio/`, `documents/`, `images/`, `videos/`, `exports/`).
+  - Reload from disk endpoint (`POST /api/projects/:id/reload-json`) reconciles external edits or restored folders into SQLite.
+  - Ordered Production Parts (`Scene`, `Chapter`, `Segment`, `Voiceover`) with lifecycle statuses (`Draft`, `In Progress`, `Ready`, `Done`), `completed_at` timestamps, and many-to-many entity links.
+  - Canvas mini-parts: interactive cards on the planning canvas with clickable status badges and arrow connection anchors.
+  - Custom Addons: in-app audio player with speed controls (0.75x to 2x), monospace document/script reader, PDF embed, and path-traversal-safe native OS File Explorer reveal (`explorer.exe /select,"<path>"`).
+  - Multi-workspace operations: Deep Copy, Non-destructive Merge (with duplicate name suffixing), and Visual Transfer Workbench.
 
 ## Key Rules & Invariants
 - **Markdown file restriction**: Exactly 4 markdown files permitted in the repository: `README.md`, `changelog.md`, `memory.md`, and `agent.md`.
@@ -42,9 +47,12 @@ Atelier is a local-only, single-user content sketchbook and visual planning canv
 - **UTF-8 Safety**: String truncation uses `safe_truncate` Unicode scalar counts rather than raw byte slicing.
 - **Payload Limits**: Axum `DefaultBodyLimit` set to 50MB to support full project `.zip` backup restores and image uploads.
 - **Data directory**: SQLite database stored at `data/atelier.db`, uploaded media stored at `data/uploads/`. Both are gitignored.
+- **Zip Slip Prevention**: Project package extraction sanitizes entry paths via `file.enclosed_name()` and checks against destination jail path, rejecting path traversal attacks.
+- **Project Boundary Integrity**: Workspaces must retain at least one project; deleting the sole remaining project is rejected with 400 Bad Request.
+- **Deep Copy & Merge Remapping**: Board items referencing parts (`entity_type == "part"`) are remapped to new part IDs during copy and merge operations.
 
 ## Verification Status
-- Integration test suite in `tests/api_tests.rs` with 14 comprehensive tests (100% passing):
+- Integration test suite in `tests/api_tests.rs` with 24 comprehensive tests (100% passing, 0 warnings, 0 failures):
   - `test_prompts_crud_and_tags`
   - `test_characters_crud_and_linkage`
   - `test_links_and_tags`
@@ -59,3 +67,13 @@ Atelier is a local-only, single-user content sketchbook and visual planning canv
   - `test_entity_validation_and_ownership`
   - `test_full_zip_archive_restore_and_verification`
   - `test_update_validation_empty_fields`
+  - `test_phase9_projects_crud_and_json_sync`
+  - `test_phase9_parts_crud_status_cycling_and_entities`
+  - `test_phase9_attachments_and_file_streaming`
+  - `test_phase9_filesystem_reveal_security`
+  - `test_phase9_deep_copy_and_merge_and_transfer`
+  - `test_phase9_export_and_import_project_package`
+  - `test_phase9_zip_slip_rejection`
+  - `test_phase9_cannot_delete_only_project`
+  - `test_phase9_deep_copy_and_merge_remap_board_part_items`
+  - `test_phase9_reload_json_with_new_unassigned_entities`

@@ -2,6 +2,206 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // ==========================================
+// Projects
+// ==========================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Project {
+    pub id: i64,
+    pub name: String,
+    pub description: Option<String>,
+    pub status: String,
+    pub color: String,
+    pub created_at: String,
+    pub updated_at: String,
+    #[serde(default)]
+    pub prompts_count: Option<i64>,
+    #[serde(default)]
+    pub characters_count: Option<i64>,
+    #[serde(default)]
+    pub links_count: Option<i64>,
+    #[serde(default)]
+    pub boards_count: Option<i64>,
+    #[serde(default)]
+    pub parts_count: Option<i64>,
+    #[serde(default)]
+    pub completed_parts_count: Option<i64>,
+    #[serde(default)]
+    pub progress_percent: Option<i64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateProjectDto {
+    pub name: String,
+    pub description: Option<String>,
+    pub status: Option<String>,
+    pub color: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpdateProjectDto {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub status: Option<String>,
+    pub color: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CopyProjectDto {
+    #[serde(alias = "name")]
+    pub new_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct MergeProjectDto {
+    pub source_project_id: Option<i64>,
+    pub target_project_id: Option<i64>,
+    pub keep_source: Option<bool>,
+    pub rename_conflicts: Option<bool>,
+    pub copy_media: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransferItemDto {
+    pub entity_type: String, // "character" | "prompt" | "link" | "board" | "part"
+    pub entity_id: i64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TransferProjectDto {
+    pub source_project_id: i64,
+    pub target_project_id: i64,
+    pub items: Vec<TransferItemDto>,
+    #[serde(alias = "mode")]
+    pub action: String, // "move" | "copy"
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RevealDto {
+    pub path: String,
+}
+
+// ==========================================
+// Project Parts
+// ==========================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectPart {
+    pub id: i64,
+    pub project_id: i64,
+    pub title: String,
+    pub part_type: String,
+    pub status: String,
+    pub order_index: i64,
+    pub description: Option<String>,
+    pub notes: Option<String>,
+    pub board_id: Option<i64>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub completed_at: Option<String>,
+    #[serde(default)]
+    pub linked_character_ids: Vec<i64>,
+    #[serde(default)]
+    pub linked_prompt_ids: Vec<i64>,
+    #[serde(default)]
+    pub linked_link_ids: Vec<i64>,
+    #[serde(default)]
+    pub linked_characters: Vec<Character>,
+    #[serde(default)]
+    pub linked_prompts: Vec<Prompt>,
+    #[serde(default)]
+    pub linked_links: Vec<Link>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreatePartDto {
+    pub title: String,
+    pub part_type: Option<String>,
+    pub status: Option<String>,
+    pub order_index: Option<i64>,
+    pub description: Option<String>,
+    pub notes: Option<String>,
+    pub board_id: Option<i64>,
+    pub linked_character_ids: Option<Vec<i64>>,
+    pub linked_prompt_ids: Option<Vec<i64>>,
+    pub linked_link_ids: Option<Vec<i64>>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpdatePartDto {
+    pub title: Option<String>,
+    pub part_type: Option<String>,
+    pub status: Option<String>,
+    pub order_index: Option<i64>,
+    pub description: Option<String>,
+    pub notes: Option<String>,
+    pub board_id: Option<i64>,
+    pub linked_character_ids: Option<Vec<i64>>,
+    pub linked_prompt_ids: Option<Vec<i64>>,
+    pub linked_link_ids: Option<Vec<i64>>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpdatePartStatusDto {
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ReorderPartsDto {
+    pub part_ids: Vec<i64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AttachPartEntityDto {
+    pub entity_type: String,
+    pub entity_id: i64,
+}
+
+// ==========================================
+// Project Attachments (Custom Addons)
+// ==========================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectAttachment {
+    pub id: i64,
+    pub project_id: i64,
+    pub part_id: Option<i64>,
+    pub name: String,
+    pub addon_type: String,
+    pub file_path: String,
+    pub file_size: Option<i64>,
+    pub mime_type: Option<String>,
+    pub notes: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    #[serde(default)]
+    pub download_url: Option<String>,
+}
+
+// ==========================================
+// Dual Storage Manifest
+// ==========================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectManifest {
+    pub project: Project,
+    #[serde(default)]
+    pub parts: Vec<ProjectPart>,
+    #[serde(default)]
+    pub prompts: Vec<Prompt>,
+    #[serde(default)]
+    pub characters: Vec<Character>,
+    #[serde(default)]
+    pub links: Vec<Link>,
+    #[serde(default)]
+    pub boards: Vec<Board>,
+    #[serde(default)]
+    pub board_items: Vec<BoardItem>,
+    #[serde(default)]
+    pub attachments: Vec<ProjectAttachment>,
+}
+
+// ==========================================
 // Prompts
 // ==========================================
 
@@ -17,7 +217,11 @@ pub struct Prompt {
     pub notes: Option<String>,
     pub is_favorite: bool,
     pub character_id: Option<i64>,
+    #[serde(default)]
+    pub project_id: Option<i64>,
     pub created_at: String,
+    #[serde(default)]
+    pub updated_at: Option<String>,
     #[serde(default)]
     pub tags: Vec<String>,
     pub character_name: Option<String>,
@@ -34,6 +238,7 @@ pub struct CreatePromptDto {
     pub notes: Option<String>,
     pub is_favorite: Option<bool>,
     pub character_id: Option<i64>,
+    pub project_id: Option<i64>,
     pub tags: Option<Vec<String>>,
 }
 
@@ -48,6 +253,7 @@ pub struct UpdatePromptDto {
     pub notes: Option<String>,
     pub is_favorite: Option<bool>,
     pub character_id: Option<i64>,
+    pub project_id: Option<i64>,
     pub tags: Option<Vec<String>>,
 }
 
@@ -63,7 +269,11 @@ pub struct Character {
     pub traits: Option<String>,
     pub image_path: Option<String>,
     pub notes: Option<String>,
+    #[serde(default)]
+    pub project_id: Option<i64>,
     pub created_at: String,
+    #[serde(default)]
+    pub updated_at: Option<String>,
     #[serde(default)]
     pub tags: Vec<String>,
     pub prompts_count: Option<i64>,
@@ -77,6 +287,7 @@ pub struct CreateCharacterDto {
     pub traits: Option<String>,
     pub image_path: Option<String>,
     pub notes: Option<String>,
+    pub project_id: Option<i64>,
     pub tags: Option<Vec<String>>,
 }
 
@@ -87,6 +298,7 @@ pub struct UpdateCharacterDto {
     pub traits: Option<String>,
     pub image_path: Option<String>,
     pub notes: Option<String>,
+    pub project_id: Option<i64>,
     pub tags: Option<Vec<String>>,
 }
 
@@ -102,7 +314,11 @@ pub struct Link {
     pub title: Option<String>,
     pub description: Option<String>,
     pub thumbnail_url: Option<String>,
+    #[serde(default)]
+    pub project_id: Option<i64>,
     pub created_at: String,
+    #[serde(default)]
+    pub updated_at: Option<String>,
     #[serde(default)]
     pub tags: Vec<String>,
 }
@@ -114,6 +330,7 @@ pub struct CreateLinkDto {
     pub title: Option<String>,
     pub description: Option<String>,
     pub thumbnail_url: Option<String>,
+    pub project_id: Option<i64>,
     pub tags: Option<Vec<String>>,
 }
 
@@ -124,6 +341,7 @@ pub struct UpdateLinkDto {
     pub title: Option<String>,
     pub description: Option<String>,
     pub thumbnail_url: Option<String>,
+    pub project_id: Option<i64>,
     pub tags: Option<Vec<String>>,
 }
 
@@ -176,7 +394,11 @@ pub struct Board {
     pub pan_y: f64,
     pub zoom: f64,
     pub drawing_data: serde_json::Value,
+    #[serde(default)]
+    pub project_id: Option<i64>,
     pub created_at: String,
+    #[serde(default)]
+    pub updated_at: Option<String>,
     pub items_count: Option<i64>,
 }
 
@@ -185,6 +407,7 @@ pub struct CreateBoardDto {
     pub name: String,
     pub theme: Option<String>,
     pub canvas_style: Option<String>,
+    pub project_id: Option<i64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -196,6 +419,7 @@ pub struct UpdateBoardDto {
     pub pan_y: Option<f64>,
     pub zoom: Option<f64>,
     pub drawing_data: Option<serde_json::Value>,
+    pub project_id: Option<i64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -207,7 +431,7 @@ pub struct UpdateDrawingDto {
 pub struct BoardItem {
     pub id: i64,
     pub board_id: i64,
-    pub entity_type: String, // 'prompt' | 'character' | 'link' | 'note'
+    pub entity_type: String, // 'prompt' | 'character' | 'link' | 'note' | 'part'
     pub entity_id: Option<i64>,
     pub note_text: Option<String>,
     pub pos_x: f64,

@@ -27,8 +27,56 @@
         <button class="sidebar-toggle-btn" id="sidebar-toggle" title="Compress Sidebar"><i class="fa-solid fa-bars"></i></button>
       </div>
 
+      <!-- Project Switcher Component -->
+      <div class="sidebar-project-switcher" id="sidebar-project-switcher">
+        <button class="project-switcher-btn" id="project-switcher-btn" type="button" title="Switch Workspace Project">
+          <i class="fa-solid fa-folder-tree project-switcher-icon"></i>
+          <span class="project-switcher-dot" id="project-switcher-dot"></span>
+          <span class="project-switcher-info">
+            <span class="project-switcher-name" id="project-switcher-name">Default Project</span>
+            <span class="project-switcher-status badge badge-sm" id="project-switcher-status">Draft</span>
+          </span>
+          <span class="project-switcher-caret"><i class="fa-solid fa-chevron-down"></i></span>
+        </button>
+
+        <!-- Switcher Dropdown Panel -->
+        <div class="project-switcher-dropdown" id="project-switcher-dropdown">
+          <div class="dropdown-header">
+            <span>Active Project</span>
+            <button type="button" class="btn-icon-close" id="btn-close-project-dropdown" title="Close"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          <div class="project-stats-chips" id="project-stats-chips">
+            <button class="stat-chip" data-goto="prompts" title="View Prompts"><i class="fa-solid fa-feather-pointed"></i> Prompts: <span id="chip-prompts">0</span></button>
+            <button class="stat-chip" data-goto="characters" title="View Characters"><i class="fa-solid fa-users"></i> Characters: <span id="chip-characters">0</span></button>
+            <button class="stat-chip" data-goto="links" title="View References"><i class="fa-solid fa-link"></i> References: <span id="chip-links">0</span></button>
+            <button class="stat-chip" data-goto="boards" title="View Boards"><i class="fa-solid fa-chalkboard"></i> Boards: <span id="chip-boards">0</span></button>
+            <button class="stat-chip" data-goto="parts" title="View Parts"><i class="fa-solid fa-film"></i> Parts: <span id="chip-parts">0</span></button>
+          </div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-section-title">All Projects</div>
+          <div class="dropdown-projects-list" id="dropdown-projects-list">
+            <!-- Populated by JS -->
+          </div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-actions">
+            <button class="btn btn-primary btn-sm w-100" id="btn-quick-new-project"><i class="fa-solid fa-plus"></i> New Project</button>
+            <button class="btn btn-secondary btn-sm w-100" id="btn-goto-projects-view"><i class="fa-solid fa-folder-tree"></i> Manage Projects</button>
+          </div>
+        </div>
+      </div>
+
       <nav class="sidebar-nav">
-        <button class="nav-item active" data-view="prompts">
+        <button class="nav-item active" data-view="projects">
+          <span class="nav-icon"><i class="fa-solid fa-folder-tree"></i></span>
+          <span class="nav-label">Projects OS</span>
+          <span class="nav-badge" id="badge-projects">1</span>
+        </button>
+        <button class="nav-item" data-view="parts">
+          <span class="nav-icon"><i class="fa-solid fa-film"></i></span>
+          <span class="nav-label">Production Parts</span>
+          <span class="nav-badge" id="badge-parts">0</span>
+        </button>
+        <button class="nav-item" data-view="prompts">
           <span class="nav-icon"><i class="fa-solid fa-feather-pointed"></i></span>
           <span class="nav-label">Prompts</span>
           <span class="nav-badge" id="badge-prompts">0</span>
@@ -74,8 +122,117 @@
     <!-- Main View Container -->
     <main class="main-content" id="main-content">
 
+      <!-- ================= PROJECTS VIEW (ROOT LANDING) ================= -->
+      <section class="view-section active" id="view-projects">
+        <header class="view-header">
+          <div class="header-left">
+            <h2>Projects Operating System</h2>
+            <p class="section-desc">Multi-workspace manager with dual SQLite and disk folder storage, auto-syncing, and production pipelines</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-primary" id="btn-new-project"><i class="fa-solid fa-plus"></i> New Project</button>
+            <button class="btn btn-secondary" id="btn-import-project-package"><i class="fa-solid fa-file-import"></i> Import Package (.zip/.json)</button>
+            <input type="file" id="project-package-input" accept=".zip,.json" style="display: none;">
+          </div>
+        </header>
+
+        <div class="filter-bar">
+          <div class="search-input-wrapper">
+            <span class="search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+            <input type="text" id="filter-projects-search" class="form-input" placeholder="Search projects by name or description...">
+          </div>
+          <select id="filter-projects-status" class="form-select">
+            <option value="">All Statuses</option>
+            <option value="Draft">Draft</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Review">Review</option>
+            <option value="Completed">Completed</option>
+            <option value="Archived">Archived</option>
+          </select>
+          <select id="filter-projects-sort" class="form-select">
+            <option value="updated">Recently Updated</option>
+            <option value="name">Name (A-Z)</option>
+            <option value="progress">Completion %</option>
+          </select>
+        </div>
+
+        <div class="cards-grid" id="projects-grid">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- ================= PRODUCTION PARTS VIEW ================= -->
+      <section class="view-section" id="view-parts">
+        <header class="view-header">
+          <div class="header-left">
+            <h2>Production Parts & Scenes</h2>
+            <p class="section-desc">Modular scenes, chapters, segments, and voiceovers linked to prompts, characters, references, and media</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-primary" id="btn-new-part"><i class="fa-solid fa-plus"></i> New Part</button>
+            <button class="btn btn-secondary" id="btn-open-attachment-modal"><i class="fa-solid fa-cloud-arrow-up"></i> Upload Media</button>
+            <button class="btn btn-outline" id="btn-open-active-project-folder" title="Open Active Project Folder"><i class="fa-solid fa-folder-open"></i> Open Folder</button>
+          </div>
+        </header>
+
+        <!-- Project Progress Bar Header -->
+        <div class="project-summary-banner" id="parts-progress-banner">
+          <div class="progress-banner-info">
+            <span class="progress-banner-title" id="parts-banner-title">Active Project Progress</span>
+            <span class="progress-banner-ratio" id="parts-banner-ratio">0 of 0 parts completed (0%)</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="parts-banner-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <div class="filter-bar">
+          <div class="search-input-wrapper">
+            <span class="search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+            <input type="text" id="filter-parts-search" class="form-input" placeholder="Search parts by title or notes...">
+          </div>
+          <select id="filter-parts-type" class="form-select">
+            <option value="">All Types</option>
+            <option value="scene">Scene</option>
+            <option value="chapter">Chapter</option>
+            <option value="segment">Segment</option>
+            <option value="voiceover">Voiceover</option>
+            <option value="note">Production Note</option>
+          </select>
+          <select id="filter-parts-status" class="form-select">
+            <option value="">All Statuses</option>
+            <option value="Draft">Draft</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Ready">Ready</option>
+            <option value="Done">Done</option>
+          </select>
+        </div>
+
+        <div class="parts-workspace-layout">
+          <div class="parts-timeline-column">
+            <div class="timeline-header">
+              <h3>Production Timeline</h3>
+              <span class="timeline-hint">Click status pill to cycle: Draft <i class="fa-solid fa-arrow-right"></i> In Progress <i class="fa-solid fa-arrow-right"></i> Ready <i class="fa-solid fa-arrow-right"></i> Done</span>
+            </div>
+            <div class="parts-timeline-list" id="parts-timeline-list">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <div class="parts-media-column">
+            <div class="media-shelf-header">
+              <h3>Project Media & Custom Addons</h3>
+              <button class="btn btn-secondary btn-sm" id="btn-quick-upload-media"><i class="fa-solid fa-plus"></i> Add File</button>
+            </div>
+            <div class="project-media-shelf" id="project-media-shelf">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- ================= PROMPTS VIEW ================= -->
-      <section class="view-section active" id="view-prompts">
+      <section class="view-section" id="view-prompts">
         <header class="view-header">
           <div class="header-left">
             <h2>Prompts Repository</h2>
@@ -315,6 +472,7 @@
                 <button class="drawer-tab active" data-drawer-tab="prompts">Prompts</button>
                 <button class="drawer-tab" data-drawer-tab="characters">Characters</button>
                 <button class="drawer-tab" data-drawer-tab="links">Links</button>
+                <button class="drawer-tab" data-drawer-tab="parts">Parts</button>
               </div>
               <div class="drawer-search">
                 <input type="text" id="drawer-search-input" class="form-input form-input-sm" placeholder="Search drawer items...">
@@ -637,6 +795,311 @@
           <button type="submit" class="btn btn-primary">Create Board</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Project Modal -->
+  <div class="modal-overlay" id="modal-project">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="project-modal-title">New Workspace Project</h3>
+        <button class="btn-close" onclick="closeModal('modal-project')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="form-project" class="modal-body">
+        <input type="hidden" id="project-id">
+        <div class="form-group">
+          <label for="project-name">Project Name *</label>
+          <input type="text" id="project-name" class="form-input" required placeholder="e.g. Season 1 Pitch, Sci-Fi Worldbuilding">
+        </div>
+        <div class="form-group">
+          <label for="project-description">Project Description</label>
+          <textarea id="project-description" class="form-textarea" rows="3" placeholder="Core vision, creative parameters, target deliverables..."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="project-status">Project Status</label>
+          <select id="project-status" class="form-select">
+            <option value="Draft">Draft</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Review">Review</option>
+            <option value="Completed">Completed</option>
+            <option value="Archived">Archived</option>
+          </select>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-project')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-project">Save Project</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Production Part Modal -->
+  <div class="modal-overlay" id="modal-part">
+    <div class="modal-box modal-lg">
+      <div class="modal-header">
+        <h3 id="part-modal-title">New Production Part</h3>
+        <button class="btn-close" onclick="closeModal('modal-part')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="form-part" class="modal-body">
+        <input type="hidden" id="part-id">
+        <div class="form-row">
+          <div class="form-group flex-2">
+            <label for="part-title">Part Title *</label>
+            <input type="text" id="part-title" class="form-input" required placeholder="e.g. Scene 1 - Cyber Alleyway Encounter">
+          </div>
+          <div class="form-group flex-1">
+            <label for="part-type">Part Type</label>
+            <select id="part-type" class="form-select">
+              <option value="scene">Scene</option>
+              <option value="chapter">Chapter</option>
+              <option value="segment">Segment</option>
+              <option value="voiceover">Voiceover</option>
+              <option value="note">Production Note</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="part-status">Status</label>
+            <select id="part-status" class="form-select">
+              <option value="Draft">Draft</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Ready">Ready</option>
+              <option value="Done">Done</option>
+            </select>
+          </div>
+          <div class="form-group flex-1">
+            <label for="part-sequence">Sequence Order #</label>
+            <input type="number" id="part-sequence" class="form-input" min="1" value="1">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="part-content">Script Excerpt / Scene Breakdown / Lore</label>
+          <textarea id="part-content" class="form-textarea code-font" rows="5" placeholder="Write scene script, beats, lighting directives, voice cues..."></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-part')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-part">Save Part</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Link Entity Modal -->
+  <div class="modal-overlay" id="modal-link-entity">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="link-entity-modal-title">Link Asset to Part</h3>
+        <button class="btn-close" onclick="closeModal('modal-link-entity')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="form-link-entity" class="modal-body">
+        <input type="hidden" id="link-entity-part-id">
+        <div class="form-group">
+          <label for="link-entity-type">Asset Type</label>
+          <select id="link-entity-type" class="form-select">
+            <option value="character">Character Persona</option>
+            <option value="prompt">Prompt Template</option>
+            <option value="link">Reference Link</option>
+            <option value="board">Visual Board</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="link-entity-target">Select Item</label>
+          <select id="link-entity-target" class="form-select" required>
+            <!-- Dynamically populated -->
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="link-entity-notes">Relationship / Context Notes</label>
+          <input type="text" id="link-entity-notes" class="form-input" placeholder="e.g. Lead protagonist in opening sequence">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-link-entity')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Attach Asset</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Attachment Upload Modal -->
+  <div class="modal-overlay" id="modal-attachment">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="attachment-modal-title">Upload Project Media / Addon</h3>
+        <button class="btn-close" onclick="closeModal('modal-attachment')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="form-attachment" class="modal-body">
+        <div class="form-group">
+          <label for="attachment-file-input">Select File *</label>
+          <input type="file" id="attachment-file-input" class="form-input" required>
+          <span class="form-hint">Supports audio (.mp3, .wav), documents (.txt, .md, .pdf), videos (.mp4, .webm), and images (.png, .jpg)</span>
+        </div>
+        <div class="form-group">
+          <label for="attachment-part-select">Associate with Part (Optional)</label>
+          <select id="attachment-part-select" class="form-select">
+            <option value="">General Project Asset (No specific part)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="attachment-notes">Notes / Production Tags</label>
+          <input type="text" id="attachment-notes" class="form-input" placeholder="e.g. Voiceover take 2, Draft storyboard">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-attachment')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-attachment">Upload File</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Merge Projects Modal -->
+  <div class="modal-overlay" id="modal-merge">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>Merge Project Workspace</h3>
+        <button class="btn-close" onclick="closeModal('modal-merge')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="form-merge" class="modal-body">
+        <input type="hidden" id="merge-source-id">
+        <div class="form-group">
+          <label>Source Project</label>
+          <div class="form-static-val" id="merge-source-label">Project Name</div>
+        </div>
+        <div class="form-group">
+          <label for="merge-target-select">Merge Into Target Project *</label>
+          <select id="merge-target-select" class="form-select" required>
+            <!-- Populated by JS -->
+          </select>
+        </div>
+        <div class="form-group checkbox-group">
+          <label>
+            <input type="checkbox" id="merge-rename-conflicts" checked> Auto-suffix duplicate titles with (Merged)
+          </label>
+        </div>
+        <div class="form-group checkbox-group">
+          <label>
+            <input type="checkbox" id="merge-copy-media" checked> Copy associated media and addon files
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-merge')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Merge Workspaces</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Visual Transfer Workbench Modal -->
+  <div class="modal-overlay" id="modal-transfer">
+    <div class="modal-box modal-xl">
+      <div class="modal-header">
+        <h3>Visual Transfer Workbench</h3>
+        <button class="btn-close" onclick="closeModal('modal-transfer')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body transfer-workbench-body">
+        <div class="transfer-toolbar">
+          <div class="transfer-side-header">
+            <label for="transfer-source-select">Source Workspace:</label>
+            <select id="transfer-source-select" class="form-select select-compact"></select>
+          </div>
+          <div class="transfer-mode-selector">
+            <label class="radio-label">
+              <input type="radio" name="transfer-mode" value="copy" checked> Copy Items
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="transfer-mode" value="move"> Move Items
+            </label>
+          </div>
+          <div class="transfer-side-header">
+            <label for="transfer-target-select">Target Workspace:</label>
+            <select id="transfer-target-select" class="form-select select-compact"></select>
+          </div>
+        </div>
+
+        <div class="transfer-dual-pane">
+          <div class="transfer-pane" id="transfer-source-pane">
+            <div class="transfer-pane-header">
+              <span>Source Items</span>
+              <button type="button" class="btn btn-xs btn-outline" id="btn-transfer-select-all">Select All</button>
+            </div>
+            <div class="transfer-items-container" id="transfer-items-list">
+              <!-- Checkboxes for Prompts, Characters, Links, Boards, Parts -->
+            </div>
+          </div>
+          <div class="transfer-pane-arrow">
+            <i class="fa-solid fa-arrow-right"></i>
+          </div>
+          <div class="transfer-pane" id="transfer-target-pane">
+            <div class="transfer-pane-header">
+              <span>Target Workspace Overview</span>
+            </div>
+            <div class="transfer-target-summary" id="transfer-target-summary">
+              <!-- Summary of target project -->
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-transfer')">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btn-execute-transfer"><i class="fa-solid fa-arrows-split-up-and-left"></i> Execute Transfer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Media Viewer Modal -->
+  <div class="modal-overlay" id="modal-media-viewer">
+    <div class="modal-box modal-lg">
+      <div class="modal-header">
+        <div class="media-title-group">
+          <span class="badge badge-primary" id="media-viewer-badge">Media</span>
+          <h3 id="media-viewer-title">Filename</h3>
+        </div>
+        <button class="btn-close" onclick="closeModal('modal-media-viewer')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body media-viewer-body">
+        <!-- Audio Player View -->
+        <div id="media-audio-player" class="media-player-block" style="display: none;">
+          <audio id="audio-playback-el" controls class="w-100"></audio>
+          <div class="audio-speed-controls">
+            <span class="speed-label">Speed:</span>
+            <button type="button" class="speed-btn" data-speed="0.75">0.75x</button>
+            <button type="button" class="speed-btn active" data-speed="1.0">1.0x</button>
+            <button type="button" class="speed-btn" data-speed="1.25">1.25x</button>
+            <button type="button" class="speed-btn" data-speed="1.5">1.5x</button>
+            <button type="button" class="speed-btn" data-speed="2.0">2.0x</button>
+          </div>
+        </div>
+
+        <!-- Script / Monospace Text Reader -->
+        <div id="media-script-reader" class="media-player-block" style="display: none;">
+          <div class="script-reader-toolbar">
+            <button type="button" class="btn btn-xs btn-outline" id="btn-script-copy"><i class="fa-solid fa-copy"></i> Copy Text</button>
+            <button type="button" class="btn btn-xs btn-outline" id="btn-script-font-dec"><i class="fa-solid fa-font"></i> A-</button>
+            <button type="button" class="btn btn-xs btn-outline" id="btn-script-font-inc"><i class="fa-solid fa-font"></i> A+</button>
+          </div>
+          <pre id="script-reader-pre" class="script-reader-pre"></pre>
+        </div>
+
+        <!-- PDF Frame Viewer -->
+        <div id="media-pdf-viewer" class="media-player-block" style="display: none;">
+          <iframe id="pdf-viewer-frame" class="pdf-viewer-frame"></iframe>
+        </div>
+
+        <!-- Video Player View -->
+        <div id="media-video-player" class="media-player-block" style="display: none;">
+          <video id="video-playback-el" controls class="video-playback-el"></video>
+        </div>
+
+        <!-- Image Viewer View -->
+        <div id="media-image-viewer" class="media-player-block" style="display: none;">
+          <img id="image-playback-el" class="image-playback-el" alt="Preview">
+        </div>
+      </div>
+      <div class="modal-footer media-viewer-footer">
+        <button type="button" class="btn btn-secondary" id="btn-media-reveal"><i class="fa-solid fa-folder-open"></i> Reveal in Explorer</button>
+        <button type="button" class="btn btn-outline" id="btn-media-permalink"><i class="fa-solid fa-link"></i> Copy Permalink</button>
+        <a id="btn-media-download-link" class="btn btn-primary" download><i class="fa-solid fa-download"></i> Download</a>
+      </div>
     </div>
   </div>
 

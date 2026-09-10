@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     Json,
@@ -9,10 +9,18 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
-    handlers::tags::{get_tags_for_entity, set_entity_tags},
+    handlers::{
+        projects::sync_project_json,
+        tags::{get_tags_for_entity, set_entity_tags},
+    },
     main_types::{AppError, AppState},
     models::{CreateLinkDto, Link, UpdateLinkDto},
 };
+
+#[derive(Debug, Deserialize)]
+pub struct LinkFilterParams {
+    pub project_id: Option<i64>,
+}
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -91,33 +99,46 @@ fn urlencoding_simple(input: &str) -> String {
 // GET /api/links
 pub async fn list_links(
     State(state): State<AppState>,
+    Query(params): Query<LinkFilterParams>,
 ) -> Result<impl IntoResponse, AppError> {
     let conn = state.pool.get().map_err(|e| AppError::Database(e.to_string()))?;
 
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, url, platform, title, description, thumbnail_url, created_at
-             FROM links
-             ORDER BY id DESC",
-        )
-        .map_err(|e| AppError::Database(e.to_string()))?;
+    let mut sql = String::from(
+        "SELECT id, url, platform, title, description, thumbnail_url, project_id, created_at, updated_at
+         FROM links WHERE 1=1",
+    );
+
+    let mut bind_params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+    if let Some(pid) = params.project_id {
+        sql.push_str(" AND project_id = ?");
+        bind_params.push(Box::new(pid));
+    }
+
+    sql.push_str(" ORDER BY id DESC");
+
+    let mut stmt = conn.prepare(&sql).map_err(|e| AppError::Database(e.to_string()))?;
+
+    let rusqlite_params: Vec<&dyn rusqlite::ToSql> = bind_params.iter().map(|p| p.as_ref()).collect();
 
     let rows = stmt
-        .query_map([], |row| {
+        .query_map(rusqlite_params.as_slice(), |row| {
             let id: i64 = row.get(0)?;
             let url: String = row.get(1)?;
             let platform: Option<String> = row.get(2)?;
             let title: Option<String> = row.get(3)?;
             let description: Option<String> = row.get(4)?;
             let thumbnail_url: Option<String> = row.get(5)?;
-            let created_at: String = row.get(6)?;
-            Ok((id, url, platform, title, description, thumbnail_url, created_at))
+            let project_id: Option<i64> = row.get(6)?;
+            let created_at: String = row.get(7)?;
+            let updated_at: Option<String> = row.get(8)?;
+            Ok((id, url, platform, title, description, thumbnail_url, project_id, created_at, updated_at))
         })
         .map_err(|e| AppError::Database(e.to_string()))?;
 
     let mut links = Vec::new();
     for row in rows {
-        let (id, url, platform, title, description, thumbnail_url, created_at) =
+        let (id, url, platform, title, description, thumbnail_url, project_id, created_at, updated_at) =
             row.map_err(|e| AppError::Database(e.to_string()))?;
 
         let tags = get_tags_for_entity(&conn, "link", id).unwrap_or_default();
@@ -129,7 +150,9 @@ pub async fn list_links(
             title,
             description,
             thumbnail_url,
+            project_id,
             created_at,
+            updated_at,
             tags,
         });
     }
@@ -146,6 +169,8 @@ pub async fn create_link(
     if clean_url.is_empty() {
         return Err(AppError::BadRequest("Link URL cannot be empty".into()));
     }
+
+    let project_id = dto.project_id.unwrap_or(1);
 
     // Auto-detect platform if missing
     if dto.platform.as_deref().unwrap_or("").trim().is_empty() {
@@ -178,9 +203,10 @@ pub async fn create_link(
     let tx = conn.transaction().map_err(|e| AppError::Database(e.to_string()))?;
 
     tx.execute(
-        "INSERT INTO links (url, platform, title, description, thumbnail_url)
-         VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO links (project_id, url, platform, title, description, thumbnail_url, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now'), datetime('now'))",
         params![
+            project_id,
             clean_url,
             dto.platform,
             dto.title,
@@ -198,6 +224,7 @@ pub async fn create_link(
 
     tx.commit().map_err(|e| AppError::Database(e.to_string()))?;
 
+    let _ = sync_project_json(&conn, project_id, &state.data_dir);
     let link = get_link_by_id(&conn, link_id)?;
     Ok((StatusCode::CREATED, Json(link)))
 }
@@ -219,7 +246,8 @@ pub async fn update_link(
     Json(dto): Json<UpdateLinkDto>,
 ) -> Result<impl IntoResponse, AppError> {
     let mut conn = state.pool.get().map_err(|e| AppError::Database(e.to_string()))?;
-    let _existing = get_link_by_id(&conn, id)?;
+    let existing = get_link_by_id(&conn, id)?;
+    let project_id = existing.project_id.unwrap_or(1);
 
     let tx = conn.transaction().map_err(|e| AppError::Database(e.to_string()))?;
 
@@ -227,27 +255,32 @@ pub async fn update_link(
         if url.trim().is_empty() {
             return Err(AppError::BadRequest("Link URL cannot be empty".into()));
         }
-        tx.execute("UPDATE links SET url = ?1 WHERE id = ?2", params![url.trim(), id])
+        tx.execute("UPDATE links SET url = ?1, updated_at = datetime('now') WHERE id = ?2", params![url.trim(), id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
     if dto.platform.is_some() {
-        tx.execute("UPDATE links SET platform = ?1 WHERE id = ?2", params![dto.platform, id])
+        tx.execute("UPDATE links SET platform = ?1, updated_at = datetime('now') WHERE id = ?2", params![dto.platform, id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
     if dto.title.is_some() {
-        tx.execute("UPDATE links SET title = ?1 WHERE id = ?2", params![dto.title, id])
+        tx.execute("UPDATE links SET title = ?1, updated_at = datetime('now') WHERE id = ?2", params![dto.title, id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
     if dto.description.is_some() {
-        tx.execute("UPDATE links SET description = ?1 WHERE id = ?2", params![dto.description, id])
+        tx.execute("UPDATE links SET description = ?1, updated_at = datetime('now') WHERE id = ?2", params![dto.description, id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
     if dto.thumbnail_url.is_some() {
-        tx.execute("UPDATE links SET thumbnail_url = ?1 WHERE id = ?2", params![dto.thumbnail_url, id])
+        tx.execute("UPDATE links SET thumbnail_url = ?1, updated_at = datetime('now') WHERE id = ?2", params![dto.thumbnail_url, id])
+            .map_err(|e| AppError::Database(e.to_string()))?;
+    }
+
+    if let Some(new_pid) = dto.project_id {
+        tx.execute("UPDATE links SET project_id = ?1, updated_at = datetime('now') WHERE id = ?2", params![new_pid, id])
             .map_err(|e| AppError::Database(e.to_string()))?;
     }
 
@@ -258,6 +291,7 @@ pub async fn update_link(
 
     tx.commit().map_err(|e| AppError::Database(e.to_string()))?;
 
+    let _ = sync_project_json(&conn, project_id, &state.data_dir);
     let link = get_link_by_id(&conn, id)?;
     Ok(Json(link))
 }
@@ -268,7 +302,7 @@ pub async fn delete_link(
     Path(id): Path<i64>,
 ) -> Result<impl IntoResponse, AppError> {
     let conn = state.pool.get().map_err(|e| AppError::Database(e.to_string()))?;
-    let _link = get_link_by_id(&conn, id)?;
+    let link = get_link_by_id(&conn, id)?;
 
     conn.execute("DELETE FROM links WHERE id = ?1", params![id])
         .map_err(|e| AppError::Database(e.to_string()))?;
@@ -285,6 +319,10 @@ pub async fn delete_link(
     )
     .ok();
 
+    if let Some(pid) = link.project_id {
+        let _ = sync_project_json(&conn, pid, &state.data_dir);
+    }
+
     Ok(Json(json!({
         "status": "success",
         "id": id
@@ -294,7 +332,7 @@ pub async fn delete_link(
 pub fn get_link_by_id(conn: &Connection, id: i64) -> Result<Link, AppError> {
     let mut stmt = conn
         .prepare(
-            "SELECT id, url, platform, title, description, thumbnail_url, created_at
+            "SELECT id, url, platform, title, description, thumbnail_url, project_id, created_at, updated_at
              FROM links
              WHERE id = ?1",
         )
@@ -308,7 +346,9 @@ pub fn get_link_by_id(conn: &Connection, id: i64) -> Result<Link, AppError> {
             let title: Option<String> = row.get(3)?;
             let description: Option<String> = row.get(4)?;
             let thumbnail_url: Option<String> = row.get(5)?;
-            let created_at: String = row.get(6)?;
+            let project_id: Option<i64> = row.get(6)?;
+            let created_at: String = row.get(7)?;
+            let updated_at: Option<String> = row.get(8)?;
 
             let tags = get_tags_for_entity(conn, "link", id).unwrap_or_default();
 
@@ -319,7 +359,9 @@ pub fn get_link_by_id(conn: &Connection, id: i64) -> Result<Link, AppError> {
                 title,
                 description,
                 thumbnail_url,
+                project_id,
                 created_at,
+                updated_at,
                 tags,
             })
         })
