@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atelier — Content Sketchbook & Visual Canvas</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/fontawesome.css">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2338bdf8'><path d='M12 2C6.49 2 2 6.49 2 12c0 4.41 3.59 8 8 8h1.5c1.1 0 2-.9 2-2 0-.41-.13-.79-.35-1.11-.2-.29-.32-.65-.32-1.04 0-1.1.9-2 2-2H17c3.86 0 7-3.14 7-7 0-4.41-4.49-6.85-12-6.85zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 8 6.5 8s1.5.67 1.5 1.5S7.33 11 6.5 11zm3-4C8.67 7 8 6.33 8 5.5S8.67 4 9.5 4s1.5.67 1.5 1.5S10.33 7 9.5 7zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 4 14.5 4s1.5.67 1.5 1.5S15.33 7 14.5 7zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 8 17.5 8s1.5.67 1.5 1.5S18.33 11 17.5 11z'/></svg>">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Collapsible Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <span class="brand-icon"><i class="fa-solid fa-shapes"></i></span>
+          <div class="brand-text">
+            <h1 class="brand-title">Atelier</h1>
+            <span class="brand-subtitle">Visual Studio</span>
+          </div>
+        </div>
+        <button class="sidebar-toggle-btn" id="sidebar-toggle" title="Toggle Sidebar"><i class="fa-solid fa-bars"></i></button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-view="prompts">
+          <span class="nav-icon"><i class="fa-solid fa-feather-pointed"></i></span>
+          <span class="nav-label">Prompts</span>
+          <span class="nav-badge" id="badge-prompts">0</span>
+        </button>
+        <button class="nav-item" data-view="characters">
+          <span class="nav-icon"><i class="fa-solid fa-users"></i></span>
+          <span class="nav-label">Characters</span>
+          <span class="nav-badge" id="badge-characters">0</span>
+        </button>
+        <button class="nav-item" data-view="links">
+          <span class="nav-icon"><i class="fa-solid fa-link"></i></span>
+          <span class="nav-label">References</span>
+          <span class="nav-badge" id="badge-links">0</span>
+        </button>
+        <button class="nav-item" data-view="boards">
+          <span class="nav-icon"><i class="fa-solid fa-chalkboard"></i></span>
+          <span class="nav-label">Boards</span>
+          <span class="nav-badge" id="badge-boards">0</span>
+        </button>
+        <button class="nav-item" data-view="search">
+          <span class="nav-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+          <span class="nav-label">Search & Tags</span>
+        </button>
+        <button class="nav-item" data-view="backup">
+          <span class="nav-icon"><i class="fa-solid fa-floppy-disk"></i></span>
+          <span class="nav-label">Backup & Port</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="theme-control">
+          <label for="theme-select" class="footer-label">UI Theme</label>
+          <select id="theme-select" class="form-select select-compact">
+            <option value="dark">Dark Slate</option>
+            <option value="light">Crisp Light</option>
+            <option value="sepia">Warm Sepia</option>
+            <option value="pastel">Pastel Dream</option>
+            <option value="cyberpunk">Cyberpunk Neon</option>
+          </select>
+        </div>
+        <div class="offline-badge">
+          <span class="status-dot"></span> Local & Offline
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main View Container -->
+    <main class="main-content" id="main-content">
+
+      <!-- ================= PROMPTS VIEW ================= -->
+      <section class="view-section active" id="view-prompts">
+        <header class="view-header">
+          <div class="header-left">
+            <h2>Prompts Repository</h2>
+            <p class="section-desc">Prompt templates, model parameters, and persona-linked instructions</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-primary" id="btn-new-prompt"><i class="fa-solid fa-plus"></i> New Prompt</button>
+          </div>
+        </header>
+
+        <div class="filter-bar">
+          <div class="search-input-wrapper">
+            <span class="search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+            <input type="text" id="filter-prompts-search" class="form-input" placeholder="Filter prompts by title, body, notes...">
+          </div>
+          <select id="filter-prompts-category" class="form-select">
+            <option value="">All Categories</option>
+          </select>
+          <select id="filter-prompts-character" class="form-select">
+            <option value="">All Characters</option>
+          </select>
+          <button class="btn btn-outline" id="filter-prompts-fav"><i class="fa-solid fa-star"></i> Favorites Only</button>
+        </div>
+
+        <div class="cards-grid" id="prompts-grid">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- ================= CHARACTERS VIEW ================= -->
+      <section class="view-section" id="view-characters">
+        <header class="view-header">
+          <div class="header-left">
+            <h2>Character Roster</h2>
+            <p class="section-desc">Consistent avatars, persona profiles, visual traits, and linked prompts</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-primary" id="btn-new-character"><i class="fa-solid fa-plus"></i> New Character</button>
+          </div>
+        </header>
+
+        <div class="filter-bar">
+          <div class="search-input-wrapper">
+            <span class="search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+            <input type="text" id="filter-characters-search" class="form-input" placeholder="Search characters by name, traits, descriptions...">
+          </div>
+        </div>
+
+        <div class="cards-grid" id="characters-grid">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- ================= LINKS & REFERENCES VIEW ================= -->
+      <section class="view-section" id="view-links">
+        <header class="view-header">
+          <div class="header-left">
+            <h2>Reference Library</h2>
+            <p class="section-desc">Inspiration bookmarks with YouTube oEmbed previews and external links</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-primary" id="btn-new-link"><i class="fa-solid fa-plus"></i> Add Reference Link</button>
+          </div>
+        </header>
+
+        <div class="filter-bar">
+          <div class="search-input-wrapper">
+            <span class="search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+            <input type="text" id="filter-links-search" class="form-input" placeholder="Search links by title, url, description...">
+          </div>
+          <select id="filter-links-platform" class="form-select">
+            <option value="">All Platforms</option>
+            <option value="youtube">YouTube</option>
+            <option value="twitter">Twitter / X</option>
+            <option value="github">GitHub</option>
+            <option value="reddit">Reddit</option>
+            <option value="artstation">ArtStation</option>
+            <option value="pinterest">Pinterest</option>
+          </select>
+        </div>
+
+        <div class="cards-grid" id="links-grid">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- ================= BOARDS & CANVAS VIEW ================= -->
+      <section class="view-section" id="view-boards">
+        <!-- Boards List Sub-View -->
+        <div id="boards-list-container">
+          <header class="view-header">
+            <div class="header-left">
+              <h2>Planning Boards</h2>
+              <p class="section-desc">Visual ideation corkboards and vector diagramming workbenches</p>
+            </div>
+            <div class="header-actions">
+              <button class="btn btn-primary" id="btn-new-board"><i class="fa-solid fa-plus"></i> Create Board</button>
+            </div>
+          </header>
+
+          <div class="cards-grid" id="boards-grid">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- Canvas Active Workspace Sub-View -->
+        <div id="canvas-container" class="canvas-viewport" style="display: none;">
+          <!-- Canvas Top Navbar -->
+          <div class="canvas-navbar">
+            <div class="canvas-nav-left">
+              <button class="btn btn-secondary btn-sm" id="btn-board-back"><i class="fa-solid fa-arrow-left"></i> All Boards</button>
+              <h3 class="canvas-board-title" id="canvas-board-name" title="Click to rename">Untitled Board</h3>
+            </div>
+
+            <div class="canvas-nav-center">
+              <div class="control-group">
+                <label for="canvas-style-select">Backdrop:</label>
+                <select id="canvas-style-select" class="form-select select-compact">
+                  <option value="dot-grid">Dot Grid</option>
+                  <option value="corkboard">Corkboard</option>
+                  <option value="graph">Graph Paper</option>
+                  <option value="blank">Blank</option>
+                </select>
+              </div>
+
+              <div class="control-group">
+                <label for="board-theme-select">Theme:</label>
+                <select id="board-theme-select" class="form-select select-compact">
+                  <option value="default">Default</option>
+                  <option value="dark">Dark</option>
+                  <option value="light">Light</option>
+                  <option value="sepia">Sepia</option>
+                  <option value="pastel">Pastel</option>
+                  <option value="cyberpunk">Cyberpunk</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="canvas-nav-right">
+              <button class="btn btn-secondary btn-sm" id="btn-toggle-drawer"><i class="fa-solid fa-box-open"></i> Library Drawer</button>
+              <button class="btn btn-secondary btn-sm" id="btn-export-board-json" title="Export Board JSON"><i class="fa-solid fa-download"></i> Export</button>
+              <button class="btn btn-danger btn-sm" id="btn-delete-active-board"><i class="fa-solid fa-trash-can"></i> Delete Board</button>
+            </div>
+          </div>
+
+          <!-- Main Interactive Stage -->
+          <div class="canvas-stage-wrapper" id="canvas-stage-wrapper">
+            <div class="canvas-world" id="canvas-world">
+              <!-- SVG Layer (Connectors, Strokes, Shapes, Labels) -->
+              <svg class="canvas-svg-layer" id="canvas-svg" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <marker id="arrowhead" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+                    <polygon points="0 0, 10 4, 0 8" fill="var(--canvas-connector, #3b82f6)" />
+                  </marker>
+                  <marker id="arrowhead-selected" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+                    <polygon points="0 0, 10 4, 0 8" fill="#ec4899" />
+                  </marker>
+                </defs>
+                <g id="svg-connectors-group"></g>
+                <g id="svg-shapes-group"></g>
+                <g id="svg-drawing-group"></g>
+                <g id="svg-text-group"></g>
+                <g id="svg-active-stroke-group"></g>
+              </svg>
+
+              <!-- HTML Cards Layer (Prompts, Characters, Links, Sticky Notes) -->
+              <div class="canvas-cards-layer" id="canvas-cards"></div>
+            </div>
+
+            <!-- Floating Tool Palette -->
+            <div class="canvas-toolbar" id="canvas-tools">
+              <button class="tool-btn active" data-tool="select" title="Select & Move (V)">
+                <i class="fa-solid fa-arrow-pointer"></i>
+              </button>
+              <button class="tool-btn" data-tool="sticky" title="Sticky Note (N)">
+                <i class="fa-solid fa-note-sticky"></i>
+              </button>
+              <button class="tool-btn" data-tool="pen" title="Freehand Pen (P)">
+                <i class="fa-solid fa-pen"></i>
+              </button>
+              <button class="tool-btn" data-tool="rect" title="Rectangle Shape (R)">
+                <i class="fa-solid fa-square"></i>
+              </button>
+              <button class="tool-btn" data-tool="ellipse" title="Ellipse Shape (O)">
+                <i class="fa-solid fa-circle"></i>
+              </button>
+              <button class="tool-btn" data-tool="connector" title="Smart Arrow Connector (C)">
+                <i class="fa-solid fa-arrow-trend-up"></i>
+              </button>
+              <button class="tool-btn" data-tool="text" title="Floating Text Label (T)">
+                <i class="fa-solid fa-font"></i>
+              </button>
+
+              <div class="toolbar-divider"></div>
+
+              <!-- Color Picker Palette -->
+              <div class="palette-group" id="canvas-palette">
+                <button class="color-dot active" data-color="#3b82f6" style="background: #3b82f6;" title="Blue"></button>
+                <button class="color-dot" data-color="#10b981" style="background: #10b981;" title="Emerald"></button>
+                <button class="color-dot" data-color="#f59e0b" style="background: #f59e0b;" title="Amber"></button>
+                <button class="color-dot" data-color="#ef4444" style="background: #ef4444;" title="Red"></button>
+                <button class="color-dot" data-color="#8b5cf6" style="background: #8b5cf6;" title="Purple"></button>
+                <button class="color-dot" data-color="#ec4899" style="background: #ec4899;" title="Pink"></button>
+                <button class="color-dot" data-color="#ffffff" style="background: #ffffff; border: 1px solid #666;" title="White"></button>
+              </div>
+
+              <div class="stroke-width-group">
+                <button class="stroke-btn active" data-width="2" title="Fine Stroke"><i class="fa-solid fa-circle stroke-indicator stroke-sm"></i></button>
+                <button class="stroke-btn" data-width="5" title="Medium Stroke"><i class="fa-solid fa-circle stroke-indicator stroke-md"></i></button>
+                <button class="stroke-btn" data-width="10" title="Thick Stroke"><i class="fa-solid fa-circle stroke-indicator stroke-lg"></i></button>
+              </div>
+
+              <div class="toolbar-divider"></div>
+
+              <button class="tool-action-btn" id="btn-canvas-undo" title="Undo (Ctrl+Z)"><i class="fa-solid fa-rotate-left"></i></button>
+              <button class="tool-action-btn" id="btn-canvas-redo" title="Redo (Ctrl+Y)"><i class="fa-solid fa-rotate-right"></i></button>
+              <button class="tool-action-btn text-danger" id="btn-canvas-delete-selected" title="Delete Selected (Del)"><i class="fa-solid fa-trash-can"></i></button>
+            </div>
+
+            <!-- Floating Zoom Controls -->
+            <div class="canvas-zoom-controls">
+              <button class="zoom-btn" id="btn-zoom-in" title="Zoom In (Ctrl + Scroll)"><i class="fa-solid fa-plus"></i></button>
+              <span class="zoom-indicator" id="zoom-indicator">100%</span>
+              <button class="zoom-btn" id="btn-zoom-out" title="Zoom Out (Ctrl + Scroll)"><i class="fa-solid fa-minus"></i></button>
+              <button class="zoom-btn btn-text" id="btn-zoom-reset" title="Reset Zoom">1:1</button>
+              <button class="zoom-btn btn-text" id="btn-zoom-fit" title="Fit All Content">Fit</button>
+            </div>
+
+            <!-- Slide-out Resource Drawer -->
+            <aside class="canvas-drawer" id="canvas-drawer">
+              <div class="drawer-header">
+                <h4>Resource Drawer</h4>
+                <button class="btn-close" id="btn-close-drawer"><i class="fa-solid fa-xmark"></i></button>
+              </div>
+              <p class="drawer-hint">Click or drag any item onto the canvas to pin it.</p>
+              <div class="drawer-tabs">
+                <button class="drawer-tab active" data-drawer-tab="prompts">Prompts</button>
+                <button class="drawer-tab" data-drawer-tab="characters">Characters</button>
+                <button class="drawer-tab" data-drawer-tab="links">Links</button>
+              </div>
+              <div class="drawer-search">
+                <input type="text" id="drawer-search-input" class="form-input form-input-sm" placeholder="Search drawer items...">
+              </div>
+              <div class="drawer-list" id="drawer-items-list">
+                <!-- Populated by JS -->
+              </div>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= SEARCH & TAGS VIEW ================= -->
+      <section class="view-section" id="view-search">
+        <header class="view-header">
+          <div class="header-left">
+            <h2>Unified Search & Tag Cloud</h2>
+            <p class="section-desc">Search across all prompts, characters, and links simultaneously</p>
+          </div>
+        </header>
+
+        <div class="search-workbench">
+          <div class="search-main-input-wrap">
+            <span class="search-icon-lg"><i class="fa-solid fa-magnifying-glass"></i></span>
+            <input type="text" id="unified-search-input" class="form-input form-input-lg" placeholder="Search by keyword, name, prompt text, notes, or URL...">
+          </div>
+
+          <div class="search-filters-row">
+            <div class="type-filter-pills">
+              <button class="pill-btn active" data-search-type="all">All Items</button>
+              <button class="pill-btn" data-search-type="prompt">Prompts</button>
+              <button class="pill-btn" data-search-type="character">Characters</button>
+              <button class="pill-btn" data-search-type="link">References</button>
+            </div>
+            <label class="fav-checkbox-label">
+              <input type="checkbox" id="search-fav-only"> <i class="fa-solid fa-star"></i> Favorites Only
+            </label>
+          </div>
+
+          <div class="tag-cloud-card">
+            <div class="card-title-sm">Filter by Tag</div>
+            <div class="tag-cloud-chips" id="tag-cloud-container">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <div class="search-results-summary" id="search-results-summary">
+            Type to start searching...
+          </div>
+
+          <div class="cards-grid" id="search-results-grid">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= BACKUP & PORTABILITY VIEW ================= -->
+      <section class="view-section" id="view-backup">
+        <header class="view-header">
+          <div class="header-left">
+            <h2>Backup, Export & Portability</h2>
+            <p class="section-desc">Zero-lockin dual-mode export and instant local restore</p>
+          </div>
+        </header>
+
+        <div class="backup-grid">
+          <!-- Text Mode -->
+          <div class="backup-card">
+            <div class="backup-icon"><i class="fa-solid fa-file-code"></i></div>
+            <h3>Lightweight JSON Backup</h3>
+            <p class="backup-desc">Export all characters, prompts, links, tags, and visual boards as a single portable JSON file. Perfect for version control and fast syncing.</p>
+            <div class="backup-card-actions">
+              <a href="/api/export" class="btn btn-primary" download><i class="fa-solid fa-download"></i> Export JSON Data</a>
+              <div class="restore-dropzone" id="json-dropzone">
+                <input type="file" id="json-file-input" accept=".json" style="display: none;">
+                <button class="btn btn-outline" onclick="document.getElementById('json-file-input').click()"><i class="fa-solid fa-upload"></i> Restore from JSON</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Archive Mode -->
+          <div class="backup-card highlight">
+            <div class="backup-icon"><i class="fa-solid fa-box-archive"></i></div>
+            <h3>Full Project Compressed Archive (.zip)</h3>
+            <p class="backup-desc">Creates a complete, self-contained archive with the clean SQLite database, data dump, manifest, and all uploaded media files in <code>data/uploads/</code>.</p>
+            <div class="backup-card-actions">
+              <a href="/api/backup/archive" class="btn btn-primary" download><i class="fa-solid fa-download"></i> Export Full .zip Archive</a>
+              <div class="restore-dropzone" id="zip-dropzone">
+                <input type="file" id="zip-file-input" accept=".zip" style="display: none;">
+                <button class="btn btn-secondary" onclick="document.getElementById('zip-file-input').click()"><i class="fa-solid fa-upload"></i> Restore Full Archive (.zip)</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="backup-status-card" id="backup-status-card" style="display: none;">
+          <h4>Restore Result</h4>
+          <pre id="backup-status-output"></pre>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ================= MODALS ================= -->
+
+  <!-- Prompt Modal -->
+  <div class="modal-overlay" id="modal-prompt">
+    <div class="modal-box modal-lg">
+      <div class="modal-header">
+        <h3 id="prompt-modal-title">New Prompt</h3>
+        <button class="btn-close" onclick="closeModal('modal-prompt')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="form-prompt" class="modal-body">
+        <input type="hidden" id="prompt-id">
+        <div class="form-row">
+          <div class="form-group flex-2">
+            <label for="prompt-title">Title *</label>
+            <input type="text" id="prompt-title" class="form-input" required placeholder="e.g. Master Photorealistic Portrait">
+          </div>
+          <div class="form-group flex-1">
+            <label for="prompt-category">Category</label>
+            <input type="text" id="prompt-category" class="form-input" placeholder="e.g. Cinematic, Coding, Writing">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="prompt-body">Prompt Text *</label>
+          <textarea id="prompt-body" class="form-textarea" rows="4" required placeholder="Enter primary prompt text..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="prompt-system">System / Meta Prompt</label>
+          <textarea id="prompt-system" class="form-textarea" rows="2" placeholder="Optional system prompt or instructions..."></textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="prompt-character">Linked Character</label>
+            <select id="prompt-character" class="form-select">
+              <option value="">None (Independent Prompt)</option>
+            </select>
+          </div>
+          <div class="form-group flex-1">
+            <label for="prompt-model">Model Used</label>
+            <input type="text" id="prompt-model" class="form-input" placeholder="e.g. Midjourney v6, Claude 3.5 Sonnet, SDXL">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="prompt-parameters">Model Parameters (JSON)</label>
+          <textarea id="prompt-parameters" class="form-textarea code-font" rows="2" placeholder='{"temperature": 0.7, "aspect_ratio": "16:9", "cfg": 7.0}'></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="prompt-notes">Notes / Results</label>
+          <textarea id="prompt-notes" class="form-textarea" rows="2" placeholder="Learnings, best seeds, edge cases..."></textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-2">
+            <label for="prompt-tags">Tags (comma separated)</label>
+            <input type="text" id="prompt-tags" class="form-input" placeholder="cinematic, lighting, 8k, vfx">
+          </div>
+          <div class="form-group flex-1 checkbox-group-inline">
+            <label>
+              <input type="checkbox" id="prompt-favorite"> <i class="fa-solid fa-star"></i> Star Favorite
+            </label>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-prompt')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Prompt</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Character Modal -->
+  <div class="modal-overlay" id="modal-character">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="character-modal-title">New Character</h3>
+        <button class="btn-close" onclick="closeModal('modal-character')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="form-character" class="modal-body">
+        <input type="hidden" id="character-id">
+        <div class="form-group">
+          <label for="character-name">Character Name *</label>
+          <input type="text" id="character-name" class="form-input" required placeholder="e.g. Elena Vance, Cyber Monk">
+        </div>
+
+        <div class="form-group">
+          <label for="character-description">Profile / Background</label>
+          <textarea id="character-description" class="form-textarea" rows="3" placeholder="Core persona summary, age, personality, archetype..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="character-traits">Visual Traits & Consistency Keywords</label>
+          <input type="text" id="character-traits" class="form-input" placeholder="e.g. silver undercut, amber cybernetic eye, distressed leather trenchcoat">
+        </div>
+
+        <div class="form-group">
+          <label>Avatar / Concept Art</label>
+          <div class="image-upload-zone" id="character-avatar-zone">
+            <input type="file" id="character-file-input" accept="image/*" style="display: none;">
+            <input type="hidden" id="character-image-path">
+            <div id="avatar-preview-container" class="avatar-preview-wrap">
+              <span class="upload-prompt-text"><i class="fa-solid fa-cloud-arrow-up"></i> Click or drop image to upload</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="character-notes">Lore & Continuity Notes</label>
+          <textarea id="character-notes" class="form-textarea" rows="2" placeholder="Canon facts, relationship links, voice guidance..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="character-tags">Tags (comma separated)</label>
+          <input type="text" id="character-tags" class="form-input" placeholder="protagonist, sci-fi, cyberpunk">
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-character')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Character</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Link Modal -->
+  <div class="modal-overlay" id="modal-link">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="link-modal-title">New Reference Link</h3>
+        <button class="btn-close" onclick="closeModal('modal-link')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="form-link" class="modal-body">
+        <input type="hidden" id="link-id">
+        <div class="form-group">
+          <label for="link-url">URL *</label>
+          <input type="url" id="link-url" class="form-input" required placeholder="https://www.youtube.com/watch?v=... or any web link">
+          <span class="form-hint">YouTube links automatically pull video title and thumbnail via oEmbed</span>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-2">
+            <label for="link-title">Title (Optional)</label>
+            <input type="text" id="link-title" class="form-input" placeholder="Auto-fetched if left blank">
+          </div>
+          <div class="form-group flex-1">
+            <label for="link-platform">Platform</label>
+            <input type="text" id="link-platform" class="form-input" placeholder="youtube, artstation...">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="link-description">Description / Reference Takeaways</label>
+          <textarea id="link-description" class="form-textarea" rows="2" placeholder="Why this link is saved, camera angles, color grading..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="link-thumbnail">Custom Thumbnail URL</label>
+          <input type="url" id="link-thumbnail" class="form-input" placeholder="https://... (auto-fetched for YouTube)">
+        </div>
+
+        <div class="form-group">
+          <label for="link-tags">Tags (comma separated)</label>
+          <input type="text" id="link-tags" class="form-input" placeholder="cinematography, lighting, tutorial">
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-link')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Reference</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Board Modal -->
+  <div class="modal-overlay" id="modal-board">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="board-modal-title">New Planning Board</h3>
+        <button class="btn-close" onclick="closeModal('modal-board')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="form-board" class="modal-body">
+        <div class="form-group">
+          <label for="board-name">Board Name *</label>
+          <input type="text" id="board-name" class="form-input" required placeholder="e.g. Episode 1 Visual Pitch, Cyberpunk Wardrobe">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="board-style">Backdrop Grid</label>
+            <select id="board-style" class="form-select">
+              <option value="dot-grid">Dot Grid (Architectural)</option>
+              <option value="corkboard">Corkboard (Pinboard)</option>
+              <option value="graph">Graph Paper (Blueprint)</option>
+              <option value="blank">Blank (Minimal)</option>
+            </select>
+          </div>
+          <div class="form-group flex-1">
+            <label for="board-theme">Color Theme</label>
+            <select id="board-theme" class="form-select">
+              <option value="default">Default App Theme</option>
+              <option value="dark">Dark Slate</option>
+              <option value="light">Crisp Light</option>
+              <option value="sepia">Warm Sepia</option>
+              <option value="pastel">Pastel</option>
+              <option value="cyberpunk">Cyberpunk Neon</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-board')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Board</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Area -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="/canvas.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

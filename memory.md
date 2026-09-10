@@ -1,0 +1,61 @@
+# Project Memory — Atelier
+
+## System Overview
+Atelier is a local-only, single-user content sketchbook and visual planning canvas built with Rust and vanilla frontend technologies. It serves both the REST API and the static frontend on `http://localhost:8080`.
+
+## Architecture & Decisions
+- **Backend**:
+  - Rust 2021 edition.
+  - `axum` 0.7 for HTTP routing and static file serving via `tower-http`.
+  - `tokio` multi-threaded async runtime.
+  - `rusqlite` bundled with `backup` feature to eliminate external SQLite C-library dependencies.
+  - `r2d2` connection pooling with WAL journal mode, 5000ms busy timeout, and foreign key enforcement.
+  - YouTube oEmbed async fetching via `reqwest` (with graceful fallback on failure or offline).
+  - Dual-mode backup system:
+    - Lightweight JSON mode (`/api/export`, `/api/import`) for fast data versioning.
+    - Compressed `.zip` archive mode (`/api/backup/archive`, `/api/backup/restore`) containing clean SQLite checkpoint, JSON dump, manifest with entity counts and checksums, and `data/uploads/`.
+- **Frontend & UI System (v0.2.0 Redesign)**:
+  - Professional, enterprise-grade design inspired by Linear, Raycast, and GitHub.
+  - Zero emojis across the entire project codebase, templates, scripts, and documentation.
+  - Font Awesome 6 Free vector icon system with dual CDN and self-contained offline SVG mask stylesheet (`static/fontawesome.css`).
+  - Max `border-radius: 8px` enforced across all CSS rules, eliminating pills and circular cards.
+  - Strictly zero gradients (`linear-gradient` / `radial-gradient` completely absent); clean solid surfaces with crisp 1px borders.
+  - 5 High-contrast themes (`dark`, `light`, `sepia`, `pastel`, `cyberpunk`) saved to `localStorage`.
+  - Canvas engine (`static/canvas.js`):
+    - Unified coordinate space: `translate(${panX}px, ${panY}px) scale(${zoom})`.
+    - World <-> Screen coordinate transformations.
+    - SVG layer for drawings, shapes, floating text, and dynamic connectors.
+    - HTML layer for draggable/resizable cards (Prompts, Characters, Links, Sticky Notes).
+    - Smart snapping connectors dynamically track card anchors and recalculate paths on card movement.
+    - Multi-level Undo/Redo stack for vector elements.
+    - Autosave with debounced writes to SQLite.
+    - Slide-out resource drawer to pin items directly to the canvas.
+
+## Key Rules & Invariants
+- **Markdown file restriction**: Exactly 4 markdown files permitted in the repository: `README.md`, `changelog.md`, `memory.md`, and `agent.md`.
+- **Zero Emoji Rule**: No emojis anywhere in HTML, JavaScript, CSS, Rust source, or Markdown files.
+- **Max Radius Rule**: No element may exceed `border-radius: 8px`.
+- **Zero Gradient Rule**: No `linear-gradient` or `radial-gradient` anywhere in CSS or backdrops.
+- **SQL Safety**: All database interactions use prepared statements with parameter binding.
+- **Tags**: Lowercased and trimmed automatically before insertion or querying.
+- **Polymorphic Integrity**: SQLite triggers enforce cascaded deletions for `taggables` entries when parent prompts, characters, or links are deleted.
+- **UTF-8 Safety**: String truncation uses `safe_truncate` Unicode scalar counts rather than raw byte slicing.
+- **Payload Limits**: Axum `DefaultBodyLimit` set to 50MB to support full project `.zip` backup restores and image uploads.
+- **Data directory**: SQLite database stored at `data/atelier.db`, uploaded media stored at `data/uploads/`. Both are gitignored.
+
+## Verification Status
+- Integration test suite in `tests/api_tests.rs` with 14 comprehensive tests (100% passing):
+  - `test_prompts_crud_and_tags`
+  - `test_characters_crud_and_linkage`
+  - `test_links_and_tags`
+  - `test_boards_and_board_items`
+  - `test_cascade_deletion_on_board_items`
+  - `test_unified_search`
+  - `test_dual_mode_backup_and_restore`
+  - `test_validation_and_not_found_edge_cases`
+  - `test_sql_safety_and_special_characters`
+  - `test_utf8_multibyte_safe_truncation`
+  - `test_tag_cleanup_on_entity_deletion`
+  - `test_entity_validation_and_ownership`
+  - `test_full_zip_archive_restore_and_verification`
+  - `test_update_validation_empty_fields`

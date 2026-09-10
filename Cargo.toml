@@ -1,0 +1,36 @@
+[package]
+name = "atelier"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "atelier"
+path = "src/lib.rs"
+
+[[bin]]
+name = "atelier"
+path = "src/main.rs"
+
+[dependencies]
+axum = { version = "0.7", features = ["multipart", "macros"] }
+tokio = { version = "1.37", features = ["full"] }
+rusqlite = { version = "0.31", features = ["bundled", "blob", "backup"] }
+r2d2 = "0.8"
+r2d2_sqlite = "0.24"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tower = { version = "0.4", features = ["util"] }
+tower-http = { version = "0.5", features = ["fs", "trace", "cors"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+uuid = { version = "1.8", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+zip = { version = "2.1", default-features = false, features = ["deflate"] }
+tempfile = "3.10"
+walkdir = "2.5"
+
+[dev-dependencies]
+tower = { version = "0.4", features = ["util"] }
+http-body-util = "0.1"
+mime_guess = "2.0"
