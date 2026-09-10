@@ -237,11 +237,13 @@ function switchView(viewName) {
   // Update view sections
   document.querySelectorAll('.view-section').forEach((sec) => {
     sec.classList.remove('active');
+    sec.style.display = 'none';
   });
 
   const activeSection = document.getElementById(`view-${viewName}`);
   if (activeSection) {
     activeSection.classList.add('active');
+    activeSection.style.display = 'flex';
   }
 
   // View-specific refreshes
@@ -316,8 +318,12 @@ function handleHashRoute() {
       switchView('parts');
       const att = state.attachments.find((a) => a.id === attId);
       if (att) openMediaViewer(att);
-    } else if (section && ['projects', 'parts', 'prompts', 'characters', 'links', 'boards', 'search'].includes(section)) {
+    } else if (section && ['projects', 'parts', 'prompts', 'characters', 'links', 'boards', 'search', 'settings', 'backup', 'project-hub'].includes(section)) {
       switchView(section);
+    } else if (section === 'hub') {
+      switchView('project-hub');
+    } else {
+      switchView('project-hub');
     }
   };
 
@@ -492,10 +498,13 @@ function updateProjectSwitcherUI() {
       statusSpan.textContent = p.status;
       item.appendChild(statusSpan);
 
-      item.addEventListener('click', () => {
+      item.addEventListener('click', async () => {
         const dropdown = document.getElementById('project-switcher-dropdown');
         if (dropdown) dropdown.classList.remove('open');
-        switchProject(p.id);
+        await switchProject(p.id);
+        if (state.activeView === 'projects') {
+          switchView('project-hub');
+        }
       });
 
       listEl.appendChild(item);
@@ -504,14 +513,31 @@ function updateProjectSwitcherUI() {
 }
 
 async function switchProject(projectId) {
-  if (state.activeProjectId === projectId) return;
-  state.activeProjectId = projectId;
-  localStorage.setItem('atelier_active_project_id', projectId);
+  const numId = parseInt(projectId, 10);
+  if (isNaN(numId)) return;
+  const isSame = Number(state.activeProjectId) === numId && state.activeProject && Number(state.activeProject.id) === numId;
+  state.activeProjectId = numId;
+  localStorage.setItem('atelier_active_project_id', numId.toString());
 
-  await refreshAllData();
-  const proj = state.projects.find((p) => p.id === projectId);
+  const proj = state.projects.find((p) => Number(p.id) === numId);
   if (proj) {
+    state.activeProject = proj;
+  }
+
+  updateProjectSwitcherUI();
+
+  if (!isSame) {
+    await refreshAllData();
+  }
+
+  await refreshActiveProjectProgress();
+
+  if (proj && !isSame) {
     showToast(`Switched workspace to "${proj.name}"`);
+  }
+
+  if (state.activeView === 'project-hub') {
+    await renderProjectHub();
   }
 }
 
@@ -552,6 +578,12 @@ function renderProjectsGrid(projects) {
   projects.forEach((p) => {
     const card = document.createElement('div');
     card.className = `project-card ${p.id === state.activeProjectId ? 'active-workspace' : ''}`;
+    card.style.cursor = 'pointer';
+    card.addEventListener('click', async (e) => {
+      if (e.target.closest('button, a, input, select, textarea, .dropdown-menu, .dropdown-item')) return;
+      await switchProject(p.id);
+      switchView('project-hub');
+    });
 
     // Header
     const top = document.createElement('div');
@@ -3687,7 +3719,39 @@ function initProjectHubView() {
   document.querySelectorAll('.hub-directive-card').forEach((card) => {
     card.addEventListener('click', () => {
       const target = card.dataset.goto;
-      if (target) switchView(target);
+      if (target) {
+        if (target === 'parts') {
+          const s = document.getElementById('filter-parts-search');
+          if (s) s.value = '';
+          const t = document.getElementById('filter-parts-type');
+          if (t) t.value = '';
+          const st = document.getElementById('filter-parts-status');
+          if (st) st.value = '';
+        } else if (target === 'prompts') {
+          const s = document.getElementById('filter-prompts-search');
+          if (s) s.value = '';
+          const c = document.getElementById('filter-prompts-category');
+          if (c) c.value = '';
+          const ch = document.getElementById('filter-prompts-character');
+          if (ch) ch.value = '';
+          const fav = document.getElementById('filter-prompts-fav');
+          if (fav) fav.classList.remove('active');
+        } else if (target === 'characters') {
+          const s = document.getElementById('filter-characters-search');
+          if (s) s.value = '';
+        } else if (target === 'links') {
+          const s = document.getElementById('filter-links-search');
+          if (s) s.value = '';
+          const p = document.getElementById('filter-links-platform');
+          if (p) p.value = '';
+        } else if (target === 'boards') {
+          const bl = document.getElementById('boards-list-container');
+          if (bl) bl.style.display = 'block';
+          const cc = document.getElementById('canvas-container');
+          if (cc) cc.style.display = 'none';
+        }
+        switchView(target);
+      }
     });
   });
 
@@ -3700,14 +3764,53 @@ function initProjectHubView() {
 }
 
 async function renderProjectHub() {
-  if (!state.activeProject && state.projects.length > 0) {
-    state.activeProject = state.projects.find((p) => p.id === state.activeProjectId) || state.projects[0];
+  const pid = parseInt(state.activeProjectId, 10);
+
+  // Ensure state.activeProject matches state.activeProjectId
+  if (!state.activeProject || Number(state.activeProject.id) !== pid) {
+    state.activeProject = state.projects.find((p) => Number(p.id) === pid) || null;
   }
+
+  // Always fetch fresh project details if we have an ID
+  if (!isNaN(pid) && pid > 0) {
+    try {
+      const res = await fetch(`/api/projects/${pid}`);
+      if (res.ok) {
+        state.activeProject = await res.json();
+        const pIdx = state.projects.findIndex((p) => Number(p.id) === pid);
+        if (pIdx !== -1) {
+          state.projects[pIdx] = state.activeProject;
+        } else {
+          state.projects.push(state.activeProject);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load active project for hub', err);
+    }
+  }
+
+  // Fallback to first available project if none active
+  if (!state.activeProject && state.projects.length > 0) {
+    state.activeProject = state.projects[0];
+    state.activeProjectId = state.activeProject.id;
+    localStorage.setItem('atelier_active_project_id', state.activeProjectId.toString());
+  }
+
   const p = state.activeProject;
-  if (!p) return;
+  if (!p) {
+    const nameEl = document.getElementById('hub-project-name');
+    if (nameEl) nameEl.textContent = 'No Project Selected';
+    const descEl = document.getElementById('hub-project-desc');
+    if (descEl) descEl.textContent = 'Please select or create a project workspace to get started.';
+    const pathEl = document.getElementById('hub-project-path');
+    if (pathEl) pathEl.textContent = '-';
+    const actList = document.getElementById('hub-activity-list');
+    if (actList) actList.innerHTML = '<div class="activity-empty"><i class="fa-solid fa-folder-open"></i> No project selected. Create or select a project to view activity.</div>';
+    return;
+  }
 
   const nameEl = document.getElementById('hub-project-name');
-  if (nameEl) nameEl.textContent = p.name;
+  if (nameEl) nameEl.textContent = p.name || 'Untitled Project';
 
   const statusEl = document.getElementById('hub-project-status');
   if (statusEl) {
@@ -3718,12 +3821,11 @@ async function renderProjectHub() {
 
   const dotEl = document.getElementById('hub-project-dot');
   if (dotEl) {
-    const statusColor = p.status === 'Done' || p.status === 'Completed' ? '#10b981' : (p.status === 'Ready' ? '#38bdf8' : (p.status === 'In Progress' ? '#f59e0b' : '#64748b'));
-    dotEl.style.backgroundColor = statusColor;
+    dotEl.style.backgroundColor = getStatusDotColor(p.status);
   }
 
   const descEl = document.getElementById('hub-project-desc');
-  if (descEl) descEl.textContent = p.description || 'No description provided for this project.';
+  if (descEl) descEl.textContent = p.description || 'Workspace overview and directives hub';
 
   const folderEl = document.getElementById('hub-project-path') || document.getElementById('hub-folder-name');
   if (folderEl) folderEl.textContent = p.folder_path || `data/projects/${p.id}/`;
@@ -3731,23 +3833,25 @@ async function renderProjectHub() {
   // Progress Bar
   const progressText = document.getElementById('hub-progress-text');
   const progressFill = document.getElementById('hub-progress-fill');
-  const percent = p.progress_percent || 0;
+  const percent = p.progress_percent != null ? p.progress_percent : 0;
+  const completedParts = p.completed_parts_count != null ? p.completed_parts_count : 0;
+  const totalParts = p.parts_count != null ? p.parts_count : (state.parts ? state.parts.length : 0);
   if (progressText) {
-    progressText.textContent = `${percent}% Complete (${p.completed_parts_count || 0}/${p.parts_count || 0} Scenes Done)`;
+    progressText.textContent = `${percent}% Complete (${completedParts}/${totalParts} Scenes Done)`;
   }
   if (progressFill) progressFill.style.width = `${percent}%`;
 
-  // Directive Counts
+  // Directive Counts - safe against null values
   const countParts = document.getElementById('hub-count-parts');
-  if (countParts) countParts.textContent = state.parts.length;
+  if (countParts) countParts.textContent = p.parts_count != null ? p.parts_count : (state.parts?.length || 0);
   const countPrompts = document.getElementById('hub-count-prompts');
-  if (countPrompts) countPrompts.textContent = state.prompts.length;
+  if (countPrompts) countPrompts.textContent = p.prompts_count != null ? p.prompts_count : (state.prompts?.length || 0);
   const countChars = document.getElementById('hub-count-characters');
-  if (countChars) countChars.textContent = state.characters.length;
+  if (countChars) countChars.textContent = p.characters_count != null ? p.characters_count : (state.characters?.length || 0);
   const countLinks = document.getElementById('hub-count-links');
-  if (countLinks) countLinks.textContent = state.links.length;
+  if (countLinks) countLinks.textContent = p.links_count != null ? p.links_count : (state.links?.length || 0);
   const countBoards = document.getElementById('hub-count-boards');
-  if (countBoards) countBoards.textContent = state.boards.length;
+  if (countBoards) countBoards.textContent = p.boards_count != null ? p.boards_count : (state.boards?.length || 0);
 
   // Load Activity Timeline
   loadProjectActivity();
@@ -3786,7 +3890,11 @@ async function cycleProjectStatus() {
 }
 
 async function loadProjectActivity() {
-  if (!state.activeProjectId) return;
+  if (!state.activeProjectId) {
+    const listEl = document.getElementById('hub-activity-list');
+    if (listEl) listEl.innerHTML = '<div class="activity-empty"><i class="fa-solid fa-clock-rotate-left"></i> No active project selected.</div>';
+    return;
+  }
   const listEl = document.getElementById('hub-activity-list');
   if (listEl) listEl.innerHTML = '<div class="activity-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading recent activity...</div>';
 
@@ -3797,7 +3905,7 @@ async function loadProjectActivity() {
     renderProjectActivityTimeline();
   } catch (err) {
     console.error('Failed to load project activity', err);
-    if (listEl) listEl.innerHTML = '<div class="activity-empty">No activity items recorded yet.</div>';
+    if (listEl) listEl.innerHTML = '<div class="activity-empty"><i class="fa-solid fa-triangle-exclamation"></i> Failed to load activity feed.</div>';
   }
 }
 
@@ -3814,11 +3922,15 @@ function renderProjectActivityTimeline() {
   const sortBy = document.getElementById('hub-activity-sort')?.value || 'recent';
   let sorted = [...projectActivityData];
   if (sortBy === 'type') {
-    sorted.sort((a, b) => a.entity_type.localeCompare(b.entity_type));
+    sorted.sort((a, b) => (a.entity_type || '').localeCompare(b.entity_type || ''));
   } else if (sortBy === 'title') {
-    sorted.sort((a, b) => a.title.localeCompare(b.title));
+    sorted.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
   } else {
-    sorted.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    sorted.sort((a, b) => {
+      const timeA = new Date((a.timestamp || '').replace(' ', 'T')).getTime() || 0;
+      const timeB = new Date((b.timestamp || '').replace(' ', 'T')).getTime() || 0;
+      return timeB - timeA;
+    });
   }
 
   sorted.forEach((item) => {
@@ -3845,7 +3957,7 @@ function renderProjectActivityTimeline() {
     const titleWrap = document.createElement('div');
     const titleEl = document.createElement('span');
     titleEl.className = 'activity-entity-title';
-    titleEl.textContent = item.title;
+    titleEl.textContent = item.title || 'Untitled';
     titleWrap.appendChild(titleEl);
 
     const typeSpan = document.createElement('span');
@@ -3855,10 +3967,21 @@ function renderProjectActivityTimeline() {
     titleWrap.appendChild(typeSpan);
     details.appendChild(titleWrap);
 
+    if (item.details) {
+      const detailEl = document.createElement('p');
+      detailEl.className = 'activity-detail-text';
+      detailEl.style.fontSize = '0.78rem';
+      detailEl.style.color = 'var(--text-secondary)';
+      detailEl.style.marginTop = '0.2rem';
+      detailEl.textContent = item.details;
+      details.appendChild(detailEl);
+    }
+
     const metaWrap = document.createElement('div');
     metaWrap.style.display = 'flex';
     metaWrap.style.alignItems = 'center';
     metaWrap.style.gap = '0.5rem';
+    metaWrap.style.marginTop = '0.25rem';
 
     const tag = document.createElement('span');
     const act = (item.action || 'updated').toLowerCase();
@@ -3868,11 +3991,31 @@ function renderProjectActivityTimeline() {
 
     const time = document.createElement('span');
     time.className = 'activity-timestamp';
-    time.textContent = item.timestamp ? (item.timestamp.split('T')[0] + ' ' + (item.timestamp.split('T')[1] || '').substring(0, 5)) : '';
+    const raw = item.timestamp || '';
+    const parts = raw.split(/[T ]/);
+    const d = parts[0] || '';
+    const t = (parts[1] || '').substring(0, 5);
+    time.textContent = t ? `${d} ${t}` : d;
     metaWrap.appendChild(time);
 
     details.appendChild(metaWrap);
     row.appendChild(details);
+
+    row.style.cursor = 'pointer';
+    row.title = `Click to navigate to ${item.entity_type}`;
+    row.addEventListener('click', () => {
+      const viewMap = {
+        part: 'parts',
+        prompt: 'prompts',
+        character: 'characters',
+        link: 'links',
+        board: 'boards',
+        project: 'projects',
+      };
+      const targetView = viewMap[item.entity_type];
+      if (targetView) switchView(targetView);
+    });
+
     listEl.appendChild(row);
   });
 }

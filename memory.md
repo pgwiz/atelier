@@ -36,8 +36,9 @@ Atelier is a local-only, single-user content sketchbook and visual planning canv
   - Custom Addons: in-app audio player with speed controls (0.75x to 2x), monospace document/script reader, PDF embed, and path-traversal-safe native OS File Explorer reveal (`explorer.exe /select,"<path>"`).
   - Multi-workspace operations: Deep Copy, Non-destructive Merge (with duplicate name suffixing), and Visual Transfer Workbench.
 - **Phase 10: Project Card Redesign, Project Hub, AI Assistant & Canvas Overhaul**:
-  - Redesigned Project Card: Replaces button clutter with a primary "Open Project" button + 3-dots actions dropdown menu (`fa-ellipsis-vertical`) with verified Font Awesome 6 icons.
-  - Dedicated Project Hub (`#view-project-hub`): Management banner, Category Directives cards (Parts, Prompts, Characters, Media, Boards), and sortable "What Changed" recent activity timeline (`/api/projects/:id/activity`).
+  - Redesigned Project Card: Replaces button clutter with a primary "Open Project" button + 3-dots actions dropdown menu (`fa-ellipsis-vertical`) with verified Font Awesome 6 icons. Whole card is clickable to open Project Hub.
+  - Dedicated Project Hub (`#view-project-hub`): Management banner, Category Directives cards (Parts, Prompts, Characters, Media, Boards), and sortable "What Changed" recent activity timeline (`/api/projects/:id/activity`). Guaranteed visibility via explicit display toggles, server hydration fallback, active ID synchronization, and hash route integration (`#/projects/:id`).
+  - Complete Offline SVG Mask Icon System (`static/fontawesome.css` & `static/index.html`): 100% self-contained SVG masks for all 93 icons with zero external CDN dependencies, `.fas/.far/.fab` aliases, and fallback hollow circle mask preventing solid black box glyphs in offline environments.
   - Advanced Settings & AI Assistant: Provider config (OpenRouter, OpenAI, Anthropic, Gemini, Groq, Ollama), masked API key input, and slide-out AI Assistant drawer (`#ai-chat-drawer`) with one-click Save-to-Project actions.
   - Centered Futuristic Bottom Floating Dock (`#bottom-dock`) with arrow-up expand drawer (`#dock-expand-drawer`).
   - Cyberpunk Chamfered Futuristic Edges (`clip-path: polygon(...)` bounded within 8px) with tech corner notches.

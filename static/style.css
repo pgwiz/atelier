@@ -498,7 +498,7 @@ code, .code-font {
 }
 
 .view-section.active {
-  display: flex;
+  display: flex !important;
   flex-direction: column;
 }
 
@@ -2932,6 +2932,7 @@ body.ambient-active .ambient-fade-overlay {
   gap: 1rem;
 }
 
+.hub-banner-main,
 .hub-banner-top {
   display: flex;
   justify-content: space-between;
@@ -2940,9 +2941,30 @@ body.ambient-active .ambient-fade-overlay {
   flex-wrap: wrap;
 }
 
+.hub-project-identity,
 .hub-banner-title-wrap {
   flex: 1;
   min-width: 280px;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+}
+
+.hub-project-color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 6px;
+  background-color: var(--primary);
+  margin-top: 0.5rem;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px var(--bg-card);
+}
+
+.hub-project-titles {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .hub-title-row {
@@ -2950,6 +2972,56 @@ body.ambient-active .ambient-fade-overlay {
   align-items: center;
   gap: 0.75rem;
   margin-bottom: 0.35rem;
+}
+
+.hub-path-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+
+.hub-path-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.hub-path-code {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+}
+
+.btn-icon-xs {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background-color 0.12s;
+  padding: 0;
+  font-size: 0.75rem;
+}
+
+.btn-icon-xs:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background-color: var(--bg-card-hover);
 }
 
 .hub-project-name {

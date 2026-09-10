@@ -44,6 +44,22 @@ All notable changes to Atelier will be documented in this file.
   - Arrow key nudging for selected SVG elements and pinned cards (10px standard, 20px Shift, 1px Alt).
 
 ### Fixed & Hardened
+- **Project Hub Rendering & View Switching**:
+  - Removed suppressing inline `style="display: none;"` from `#view-project-hub` and `#view-settings` in `static/index.html`.
+  - Added `display: flex !important;` to `.view-section.active` in `static/style.css` and explicit `style.display` toggling in `switchView()` inside `static/app.js` to prevent inline style overrides.
+  - Refactored `switchProject(projectId)` in `static/app.js` to normalize project IDs to integer, prevent stale active project states, automatically transition to Project Hub when switching from the projects grid view, and await hub rendering.
+  - Enhanced `renderProjectHub()` with active ID synchronization, fresh `/api/projects/:id` fetching, null-safe directive counts (`countParts`, `countPrompts`, `countChars`, `countLinks`, `countBoards`), and a graceful empty state when no projects exist.
+  - Fixed hash router (`handleHashRoute`) to recognize `#/projects/:id`, `#/projects/:id/hub`, and `#/projects/:id/project-hub` and route directly to Project Hub.
+  - Hardened "What Changed" Activity Feed (`renderProjectActivityTimeline`) with cross-browser date parsing (`replace(' ', 'T')`), safe null-guarded title sorting, display of `item.details` annotations, and click-to-navigate interaction for all activity items.
+  - Bound dynamic status dot color via `getStatusDotColor(p.status)` and added card-level click navigation in `renderProjectsGrid()`.
+  - Added comprehensive filter resets (search, type, status, category, character, favorite, platform) when navigating via the 5 Category Directive Cards so active project entities are immediately visible.
+- **Offline Vector Icon Overhaul (`static/fontawesome.css` & `static/index.html`)**:
+  - Completely removed external cdnjs Font Awesome stylesheet link from `static/index.html` to eliminate external network requests, offline timeouts, and font rendering conflicts.
+  - Resolved "box icons" defect where icons rendered as solid black/colored squares due to undefined CSS mask images on `currentColor` pseudo-elements.
+  - Mapped all 93 unique Font Awesome icon classes used across HTML, JS, and CSS to self-contained SVG data URI masks with 0 unmapped icons.
+  - Added `.fas, .far, .fab` short alias support to the primary offline mask selector and pseudo-elements.
+  - Added safe hollow circle fallback mask on `.fa, .fa-solid, .fas, .far, .fab` ensuring dynamic/unknown icons never render as solid filled blocks.
+  - Added `@keyframes fa-spin` for smooth rotation on `.fa-spin` loader icons.
 - **Canvas Script Parsing**: Resolved fatal syntax error in `static/canvas.js` caused by an unmatched closing brace inside `handlePointerUp` that prevented the script from loading.
 - **In-App Confirmation & Prompt Dialogs**: Fixed ID mismatch in `showConfirmDialog` between JS (`btn-confirm-proceed`) and HTML (`btn-confirm-ok`), and implemented in-app `showPromptDialog` to eliminate native browser `prompt()` on project duplication and `confirm()` on media attachment deletion.
 - **Project Hub Banner & Actions**: Fixed folder path binding to `hub-project-path`, added status dot color binding to `hub-project-dot`, and wired event listeners for `btn-hub-copy-path` (clipboard copy) and `btn-hub-reveal-folder` (explorer reveal).
