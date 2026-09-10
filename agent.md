@@ -32,21 +32,26 @@ atelier/
     db.rs                # connection pool initialization & idempotent schema migrations
     models.rs            # structs for Prompt, Character, Link, Tag, Board, BoardItem, SearchResult
     handlers/
-      projects.rs        # CRUD for /api/projects, copy, merge, visual transfer, single-project export/import
+      projects.rs        # CRUD for /api/projects, activity feed, copy, merge, transfer, reload-json
       parts.rs           # CRUD for /api/projects/:id/parts, status toggles, linked entity associations
+      attachments.rs     # CRUD for project/part media attachments (audio, scripts, video) and file streaming
+      filesystem.rs      # path-traversal safe native OS File Explorer reveal (/api/fs/reveal)
       prompts.rs         # CRUD handlers for /api/prompts (scoped by project_id)
       characters.rs      # CRUD handlers for /api/characters (scoped by project_id)
       links.rs           # CRUD handlers for /api/links (scoped by project_id)
       tags.rs            # tag management, autocomplete, polymorphic tagging
       search.rs          # unified multi-entity search: GET /api/search?q=&tag=&favorite=&project_id=
-      boards.rs          # CRUD handlers for boards, board items (including mini parts), camera, and drawing data
+      boards.rs          # CRUD handlers for boards, board items, camera, drawing, and metadata enrichment
+      settings.rs        # key-value settings store for layout, themes, ambient animation, and AI config
+      ai.rs              # AI chat completions proxy (OpenRouter, OpenAI, Anthropic, Gemini, Groq, Ollama)
       backup.rs          # /api/export and /api/import full database backup & restore
       upload.rs          # /api/upload for local image uploads (saved to data/uploads/)
   static/
-    index.html           # main SPA entrypoint (collapsible sidebar + views)
-    app.js               # application router, navigation, state management
+    index.html           # main SPA entrypoint (collapsible sidebar + compound modals)
+    fontawesome.css      # 100% self-contained offline SVG vector mask icon system
+    app.js               # application router, project hub, AI drawer, state management
     canvas.js            # hybrid corkboard + SVG diagramming engine (pan/zoom, tools, connectors)
-    style.css            # styling & design tokens for global themes and board canvas styles
+    style.css            # styling & design tokens for global themes, compound panels, and ambient fade
   data/
     atelier.db          # created on first run (gitignored)
     uploads/            # uploaded character avatars and board images (gitignored)
@@ -221,6 +226,13 @@ CREATE TABLE IF NOT EXISTS board_items (
 );
 
 CREATE INDEX IF NOT EXISTS idx_board_items_board ON board_items(board_id);
+
+-- App Settings: Key-Value store for layout mode, chamfered edges, ambient animation, and AI configuration
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 ```
 
 ---
@@ -241,6 +253,7 @@ CREATE INDEX IF NOT EXISTS idx_board_items_board ON board_items(board_id);
 - `POST /api/projects/:id/reload-json` — reconcile `data/projects/<id>/project.json` edits or restored files from disk back into database
 - `GET /api/projects/:id/export` — export single project package as portable JSON or `.zip` (with associated uploaded media)
 - `POST /api/projects/import` — import standalone project package into Atelier
+- `GET /api/projects/:id/activity` — get chronological activity audit trail ("What Changed") across all child entities with sorting options
 
 ### Project Parts (Production Scenes & Stages)
 - `GET /api/projects/:id/parts` — list all ordered parts for a project with linked characters, prompts, and references
@@ -326,6 +339,11 @@ CREATE INDEX IF NOT EXISTS idx_board_items_board ON board_items(board_id);
 - **Board-Specific Export**:
   - `GET /api/boards/:id/export` — export individual board state (metadata, items, drawing vector data) as JSON
 
+### Settings & AI Assistant
+- `GET /api/settings` — retrieve all key-value settings as JSON object
+- `PUT /api/settings/:key` — update individual setting key-value pair `{value: string}`
+- `POST /api/settings/bulk` — bulk update settings `{settings: {key: value, ...}}`
+- `POST /api/ai/chat` — AI completions proxy endpoint `{provider, api_key?, model?, prompt, system_prompt?, base_url?}` supporting OpenRouter, OpenAI, Anthropic, Gemini, Groq, and Ollama with mock connection test mode
 
 ---
 

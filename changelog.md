@@ -22,6 +22,10 @@ All notable changes to Atelier will be documented in this file.
   - Added single-click selection, double-click in-place editing with pre-filled selection, auto-resizing inline editor, and clean deletion on empty commit.
   - Enabled active color dot updates for selected SVG elements and cards.
   - Added integration test `test_board_items_metadata_enrichment_and_fallbacks` covering multi-entity pinning, tag joining, and fallback metadata (28 passing tests in total).
+- **Documentation & Repository Memory Compaction**:
+  - Consolidated and updated repository truth across `README.md`, `agent.md`, `memory.md`, and `changelog.md`.
+  - Re-aligned Project Structure tree, SQLite schema migrations (`settings`), and API specifications (`GET /api/projects/:id/activity`, `GET/PUT/POST /api/settings`, `POST /api/ai/chat`).
+  - Confirmed 100% compliance with repository rules: zero emojis, max 8px border-radius, zero CSS gradients, and strictly 4 markdown files in workspace.
 
 ## [0.4.0] - 2026-09-10
 
