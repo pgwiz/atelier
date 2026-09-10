@@ -40,15 +40,21 @@
 ### 6. Hybrid Corkboard & Vector Diagramming Canvas
 - **Unified Infinite Viewport**: Synchronized SVG vector graphics layer and HTML cards layer sharing `translate(${panX}px, ${panY}px) scale(${zoom})`.
 - **Dynamic Contextual Cursors**: Contextual cursors (`crosshair` for drawing/shapes/connectors, `text` for text, `cell` for sticky notes, `move` for selected elements, `se-resize` on card handles, `grab`/`grabbing` for pan).
+- **Hover Selectable Affordances**: Visual hover affordances (`.board-card:hover`, `.canvas-svg-item:hover`) with crisp dashed borders and subtle glow showing interactive affordance.
+- **Stationary Right-Click Context Menu**: Stationary right-click (< 4px movement) triggers a custom contextual menu for cards (Copy, Duplicate, Layer Stacking, Color Swatches, Delete), vector elements (Edit Label, Copy, Duplicate, Layer Stacking, Color Swatches, Delete), and canvas (Paste, New Sticky, Add Text, Fit to View, Reset Zoom), while right-click drag pans the canvas seamlessly.
+- **Modular Shapes Flyout & Extended Palette**: Popover menu supporting Rectangle, Circle, Triangle, Diamond, Star, Line, and Arrow without toolbar clutter. Includes shortcuts `R` (Rect), `O` (Ellipse), `L` (Line), `A` (Arrow).
+- **Text Inside Geometric Shapes**: Center-anchored SVG text with multi-line word wrapping and contrast calculation. Double-click opens inline textarea editor.
+- **Element Properties Tab & Floating Inspector**: Live two-way property editor in `#canvas-properties-panel` and `#canvas-drawer` (Properties tab) for X, Y, W, H, stroke/fill colors, stroke width, dashed style, text content, font size, and layer order.
+- **Board Image Export (Retina 2x PNG & Vector SVG)**: High-resolution 2x retina HTML5 canvas PNG export and standalone vector SVG export alongside JSON archive export.
+- **Clipboard Copy/Paste & Image Pasting**: `Ctrl+C`, `Ctrl+V`, `Ctrl+D` shortcuts; intercepts OS clipboard paste and drag-and-drop to upload image files to `/api/upload` and pin them directly as cards. Plain text pastes as sticky notes.
 - **Tools**:
   - `Select (V)`: Multi-element selection, bounding box highlighting, SVG element dragging/moving, card resizing, and arrow key nudging (10px standard, 20px Shift, 1px Alt).
   - `Sticky Notes (N)`: Drop colored sticky notes anywhere with auto-focus inline text editing.
   - `Freehand Pen (P)`: Smooth SVG paths with configurable stroke widths and color palette.
-  - `Shapes (R / O)`: Draw vector rectangles and ellipses with selection outlines.
   - `Smart Snapping Connectors (C)`: Connect cards via 4 anchor ports (top/bottom/left/right); curved SVG arrows dynamically track cards as they move.
   - `Floating Text (T)`: Double-clickable vector typography labels with multi-line `<tspan>` formatting and click event isolation.
   - `Undo / Redo`: `Ctrl+Z` / `Ctrl+Y` multi-level command history.
-- **Resource Drawer**: Slide-out library to search and drag/click prompts, characters, links, and parts directly onto boards.
+- **Resource Drawer**: Slide-out library to search and drag/click prompts, characters, links, parts, and properties directly onto boards.
 - **Metadata Enrichment**: Backend joins and caches title, subtitle, thumbnail, and tags across all board items with reliable fallback generation.
 - **4 Backdrops**: Dot-grid blueprint, textured corkboard, graph paper, or solid blank.
 

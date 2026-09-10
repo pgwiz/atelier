@@ -3095,6 +3095,13 @@ function renderDrawerItems() {
   const activeTab = document.querySelector('.drawer-tab.active')?.dataset.drawerTab || 'prompts';
   const query = document.getElementById('drawer-search-input')?.value.toLowerCase().trim() || '';
 
+  if (activeTab === 'properties') {
+    if (window.atelierCanvas && typeof window.atelierCanvas.renderDrawerProperties === 'function') {
+      window.atelierCanvas.renderDrawerProperties(listContainer);
+      return;
+    }
+  }
+
   let items = [];
   if (activeTab === 'prompts') {
     items = state.prompts.map((p) => ({

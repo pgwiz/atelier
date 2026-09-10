@@ -1116,6 +1116,11 @@ code, .code-font {
   color: var(--text-primary);
 }
 
+.board-card:hover {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 1.5px rgba(56, 189, 248, 0.4), 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
 .board-card:active {
   cursor: grabbing;
 }
@@ -3973,4 +3978,431 @@ body.chamfered-mode .hub-banner-wrap {
   min-height: 38px;
   box-sizing: border-box;
 }
+
+/* ===================================================
+   CANVAS HOVER SELECTABLE AFFORDANCES
+   =================================================== */
+
+.canvas-svg-item {
+  cursor: pointer;
+  transition: stroke-width 0.12s ease;
+}
+
+.canvas-stage-wrapper.cursor-default .canvas-svg-item:hover,
+.canvas-stage-wrapper.tool-select .canvas-svg-item:hover,
+.canvas-svg-item:hover {
+  outline: 1.5px dashed var(--primary);
+  outline-offset: 2px;
+}
+
+/* Text inside geometric shapes */
+.shape-embedded-text {
+  user-select: none;
+  pointer-events: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-weight: 600;
+}
+
+/* ===================================================
+   CANVAS EXPORT DROPDOWN MENU
+   =================================================== */
+
+.canvas-export-dropdown-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.canvas-export-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 190px;
+  background-color: var(--bg-sidebar);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  z-index: 50;
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.export-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.45rem 0.65rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.12s ease;
+}
+
+.export-menu-item:hover {
+  background-color: var(--bg-card-hover);
+  color: var(--primary);
+  border-color: var(--border-subtle);
+}
+
+.export-menu-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 0.25rem 0;
+}
+
+/* ===================================================
+   MODULAR SHAPES TOOL & FLYOUT POPOVER
+   =================================================== */
+
+.shapes-tool-container {
+  position: relative;
+}
+
+.shape-caret {
+  font-size: 0.55rem;
+  margin-left: 2px;
+  opacity: 0.7;
+}
+
+.shapes-flyout-popover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--bg-sidebar);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 0.5rem;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+  z-index: 60;
+  min-width: 220px;
+}
+
+.shapes-flyout-header {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding: 0.2rem 0.4rem 0.4rem;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 0.4rem;
+}
+
+.shapes-flyout-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.35rem;
+}
+
+.shape-flyout-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.shape-flyout-btn:hover {
+  background-color: var(--bg-card-hover);
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+
+.shape-flyout-btn.active {
+  background-color: rgba(56, 189, 248, 0.15);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+/* ===================================================
+   CANVAS CONTEXT MENU (RIGHT CLICK ACTIONS)
+   =================================================== */
+
+.canvas-context-menu {
+  position: fixed;
+  z-index: 100;
+  background-color: var(--bg-sidebar);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  padding: 0.35rem;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  user-select: none;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.65rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.context-menu-item:hover {
+  background-color: var(--bg-card-hover);
+  color: var(--primary);
+  border-color: var(--border-subtle);
+}
+
+.context-menu-item.danger:hover {
+  background-color: var(--danger);
+  color: #ffffff;
+  border-color: var(--danger);
+}
+
+.context-menu-left {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.context-menu-shortcut {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: ui-monospace, monospace;
+}
+
+.context-menu-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 0.25rem 0;
+}
+
+.context-menu-colors {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.5rem;
+  justify-content: space-between;
+}
+
+.context-color-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+.context-color-dot:hover {
+  transform: scale(1.18);
+}
+
+/* ===================================================
+   FLOATING ELEMENT PROPERTIES INSPECTOR PANEL
+   =================================================== */
+
+.canvas-properties-panel {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 275px;
+  max-height: calc(100% - 6rem);
+  background-color: var(--bg-sidebar);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  z-index: 35;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.properties-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.75rem;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.properties-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.properties-heading {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.properties-panel-body {
+  padding: 0.75rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.prop-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.prop-section-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.prop-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.prop-row-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.prop-input-wrap {
+  display: flex;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  padding: 0.25rem 0.45rem;
+  gap: 0.35rem;
+}
+
+.prop-input-wrap:focus-within {
+  border-color: var(--primary);
+}
+
+.prop-prefix {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.prop-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  width: 100%;
+  font-family: ui-monospace, monospace;
+}
+
+.prop-swatches {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.prop-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+.prop-swatch:hover {
+  transform: scale(1.15);
+}
+
+.prop-swatch.active {
+  box-shadow: 0 0 0 2px var(--border-focus);
+  border-color: #ffffff;
+}
+
+.prop-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.prop-btn {
+  flex: 1;
+  padding: 0.3rem 0.45rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  transition: all 0.12s ease;
+}
+
+.prop-btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+  border-color: var(--border-focus);
+}
+
+.prop-btn.active {
+  background: var(--primary);
+  color: var(--primary-text);
+  border-color: var(--primary);
+}
+
+.prop-textarea {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  padding: 0.4rem 0.5rem;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 50px;
+  outline: none;
+}
+
+.prop-textarea:focus {
+  border-color: var(--primary);
+}
+
+.prop-empty-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 1.5rem 0.5rem;
+  line-height: 1.4;
+}
+
 

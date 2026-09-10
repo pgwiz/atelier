@@ -2,6 +2,35 @@
 
 All notable changes to Atelier will be documented in this file.
 
+## [0.4.3] - 2026-09-10
+
+### Added
+- **Planning Board Extended Vector Palette & Shapes Popover**:
+  - Implemented modular toolbar popover (`#shapes-flyout`) expanding geometric capabilities with Rectangle, Circle, Triangle, Diamond, Star, Line, and Arrow.
+  - Added mathematical 5-point star generation (`calculateStarPoints`) and polygon renderers for triangle, diamond, and star.
+  - Added keyboard shortcuts for rapid shape switching: `R` (Rectangle), `O` (Circle/Ellipse), `L` (Line), `A` (Arrow).
+- **Text Inside Geometric Shapes**:
+  - Supported centered embedded SVG text inside Rectangle, Ellipse, Triangle, Diamond, and Star.
+  - Added double-click in-place editing for shape text with real-time word wrapping and dynamic contrast calculation (`getContrastColor`).
+- **Hover Selectable Affordances**:
+  - Added visual hover affordances across cards (`.board-card:hover`) and SVG vector elements (`.canvas-svg-item:hover`) featuring crisp dashed borders and subtle glow.
+  - Provided clear visual indication that any canvas element can be selected, moved, or customized.
+- **Stationary Right-Click Context Action Menu**:
+  - Preserved right-click drag pan across background and cards while triggering a custom contextual action menu on stationary right-click (< 4px movement).
+  - Contextual actions for cards: Copy (`Ctrl+C`), Duplicate (`Ctrl+D`), Layer Forward/Backward/Front/Back, Color Swatches, and Delete.
+  - Contextual actions for vector elements: Edit Label (`fa-font`), Copy, Duplicate, Layer Stacking, Color Swatches, and Delete.
+  - Contextual actions for empty canvas: Paste (`Ctrl+V`), New Sticky Note (`N`), Add Text (`T`), Fit to View, and Reset Zoom.
+- **Element Properties Tab & Floating Inspector Panel**:
+  - Added floating inspector drawer (`#canvas-properties-panel`) and synced "Properties" tab in the library drawer (`#canvas-drawer`).
+  - Live two-way property editing for X, Y, Width, Height, Stroke Color, Fill Color, Stroke Width (1px, 2px, 4px, 8px), Dashed Style, Text Label, Font Size, and Layer Stacking.
+- **Board Image Export (Retina 2x PNG & Vector SVG)**:
+  - Added export dropdown popover (`#canvas-export-menu`) with PNG image export, SVG vector export, and JSON archive export options.
+  - Offscreen 2x retina HTML5 canvas rendering for PNG export capturing backdrop, vector strokes, shapes, and cards with high-fidelity typography and drop shadows.
+  - Standalone well-formed SVG export (`exportBoardAsSvg`) producing standards-compliant vector graphics files.
+- **Clipboard Copy, Paste, Duplicate & Image Pasting**:
+  - Implemented `Ctrl+C` (copy card or vector element), `Ctrl+V` (paste at cursor or offset), and `Ctrl+D` (duplicate in-place).
+  - Intercepted OS clipboard paste (`window.addEventListener('paste')`) and drag-and-drop: uploads image blobs to `/api/upload`, creates reference links, and pins image cards onto the canvas. Text pastes as sticky notes.
+
 ## [0.4.2] - 2026-09-10
 
 ### Fixed & Hardened

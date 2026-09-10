@@ -531,8 +531,25 @@
             </div>
 
             <div class="canvas-nav-right">
+              <button class="btn btn-secondary btn-sm" id="btn-toggle-properties" title="Toggle Element Properties Panel"><i class="fa-solid fa-sliders"></i> Properties</button>
               <button class="btn btn-secondary btn-sm" id="btn-toggle-drawer"><i class="fa-solid fa-box-open"></i> Library Drawer</button>
-              <button class="btn btn-secondary btn-sm" id="btn-export-board-json" title="Export Board JSON"><i class="fa-solid fa-download"></i> Export</button>
+              <div class="canvas-export-dropdown-wrap">
+                <button class="btn btn-secondary btn-sm" id="btn-export-dropdown-toggle" title="Export Board">
+                  <i class="fa-solid fa-download"></i> Export <i class="fa-solid fa-caret-down ms-1"></i>
+                </button>
+                <div class="canvas-export-menu" id="canvas-export-menu" style="display: none;">
+                  <button type="button" class="export-menu-item" id="btn-export-board-png">
+                    <i class="fa-solid fa-image"></i> Export Image (PNG)
+                  </button>
+                  <button type="button" class="export-menu-item" id="btn-export-board-svg">
+                    <i class="fa-solid fa-shapes"></i> Export Vector (SVG)
+                  </button>
+                  <div class="export-menu-divider"></div>
+                  <button type="button" class="export-menu-item" id="btn-export-board-json">
+                    <i class="fa-solid fa-file-code"></i> Export JSON Data
+                  </button>
+                </div>
+              </div>
               <button class="btn btn-danger btn-sm" id="btn-delete-active-board"><i class="fa-solid fa-trash-can"></i> Delete Board</button>
             </div>
           </div>
@@ -573,12 +590,49 @@
               <button class="tool-btn" data-tool="pen" title="Freehand Pen (P)">
                 <i class="fa-solid fa-pen"></i>
               </button>
-              <button class="tool-btn" data-tool="rect" title="Rectangle Shape (R)">
-                <i class="fa-solid fa-square"></i>
-              </button>
-              <button class="tool-btn" data-tool="ellipse" title="Ellipse Shape (O)">
-                <i class="fa-solid fa-circle"></i>
-              </button>
+
+              <!-- Modular Shapes Tool with Flyout Popover -->
+              <div class="shapes-tool-container" id="shapes-tool-container">
+                <button class="tool-btn" data-tool="shapes-menu" id="btn-tool-shapes" title="Geometric Shapes Palette">
+                  <i class="fa-solid fa-square" id="active-shape-icon"></i>
+                  <i class="fa-solid fa-caret-up shape-caret"></i>
+                </button>
+                <!-- Shapes Flyout Popover Grid -->
+                <div class="shapes-flyout-popover" id="shapes-flyout" style="display: none;">
+                  <div class="shapes-flyout-header">Shapes Palette</div>
+                  <div class="shapes-flyout-grid">
+                    <button type="button" class="shape-flyout-btn active" data-shape="rect" title="Rectangle (R)">
+                      <i class="fa-solid fa-square"></i>
+                      <span>Rectangle</span>
+                    </button>
+                    <button type="button" class="shape-flyout-btn" data-shape="ellipse" title="Ellipse / Circle (O)">
+                      <i class="fa-solid fa-circle"></i>
+                      <span>Circle</span>
+                    </button>
+                    <button type="button" class="shape-flyout-btn" data-shape="triangle" title="Triangle">
+                      <i class="fa-solid fa-caret-up"></i>
+                      <span>Triangle</span>
+                    </button>
+                    <button type="button" class="shape-flyout-btn" data-shape="diamond" title="Diamond">
+                      <i class="fa-solid fa-diamond"></i>
+                      <span>Diamond</span>
+                    </button>
+                    <button type="button" class="shape-flyout-btn" data-shape="star" title="Star">
+                      <i class="fa-solid fa-star"></i>
+                      <span>Star</span>
+                    </button>
+                    <button type="button" class="shape-flyout-btn" data-shape="line" title="Straight Line (L)">
+                      <i class="fa-solid fa-minus"></i>
+                      <span>Line</span>
+                    </button>
+                    <button type="button" class="shape-flyout-btn" data-shape="arrow" title="Arrow (A)">
+                      <i class="fa-solid fa-arrow-right"></i>
+                      <span>Arrow</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <button class="tool-btn" data-tool="connector" title="Smart Arrow Connector (C)">
                 <i class="fa-solid fa-arrow-trend-up"></i>
               </button>
@@ -621,6 +675,24 @@
               <button class="zoom-btn btn-text" id="btn-zoom-fit" title="Fit All Content">Fit</button>
             </div>
 
+            <!-- Floating Element Properties Inspector Panel -->
+            <div class="canvas-properties-panel" id="canvas-properties-panel" style="display: none;">
+              <div class="properties-panel-header">
+                <div class="properties-title-wrap">
+                  <i class="fa-solid fa-sliders"></i>
+                  <span class="properties-heading">Properties</span>
+                  <span class="badge badge-sm badge-info" id="prop-badge-type">Selection</span>
+                </div>
+                <button type="button" class="btn-icon-xs" id="btn-close-properties-panel" title="Close"><i class="fa-solid fa-xmark"></i></button>
+              </div>
+              <div class="properties-panel-body" id="properties-panel-content">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+
+            <!-- Custom Canvas Context Menu -->
+            <div class="canvas-context-menu" id="canvas-context-menu" style="display: none;"></div>
+
             <!-- Slide-out Resource Drawer -->
             <aside class="canvas-drawer" id="canvas-drawer">
               <div class="drawer-header">
@@ -633,6 +705,7 @@
                 <button class="drawer-tab" data-drawer-tab="characters">Characters</button>
                 <button class="drawer-tab" data-drawer-tab="links">Links</button>
                 <button class="drawer-tab" data-drawer-tab="parts">Parts</button>
+                <button class="drawer-tab" data-drawer-tab="properties">Properties</button>
               </div>
               <div class="drawer-search">
                 <input type="text" id="drawer-search-input" class="form-input form-input-sm" placeholder="Search drawer items...">
