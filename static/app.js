@@ -525,6 +525,7 @@ async function switchProject(projectId) {
   }
 
   updateProjectSwitcherUI();
+  updateAiDrawerProjectContext();
 
   if (!isSame) {
     await refreshAllData();
@@ -982,6 +983,20 @@ function initPartsView() {
   const statusSelect = document.getElementById('filter-parts-status');
   if (statusSelect) statusSelect.addEventListener('change', () => filterParts());
 
+  const sortSelect = document.getElementById('filter-parts-sort');
+  if (sortSelect) sortSelect.addEventListener('change', () => filterParts());
+
+  const aiSceneBtn = document.getElementById('btn-parts-ai-scene');
+  if (aiSceneBtn) {
+    aiSceneBtn.addEventListener('click', () => {
+      openAiChatDrawer();
+      const projName = state.activeProject?.name || 'this project';
+      const prompt = `Draft 3 sequential production scene breakdown ideas for "${projName}" with duration, visual framing, and audio notes.`;
+      appendAiMessage('user', prompt);
+      sendAiChat(prompt);
+    });
+  }
+
   const formPart = document.getElementById('form-part');
   if (formPart) formPart.addEventListener('submit', handlePartSubmit);
 
@@ -1026,8 +1041,9 @@ function filterParts() {
   const query = document.getElementById('filter-parts-search')?.value.toLowerCase().trim() || '';
   const typeFilter = document.getElementById('filter-parts-type')?.value || '';
   const statusFilter = document.getElementById('filter-parts-status')?.value || '';
+  const sortBy = document.getElementById('filter-parts-sort')?.value || 'order';
 
-  const filtered = state.parts.filter((p) => {
+  let filtered = state.parts.filter((p) => {
     if (query) {
       const inTitle = p.title.toLowerCase().includes(query);
       const inNotes = p.notes && p.notes.toLowerCase().includes(query);
@@ -1038,6 +1054,14 @@ function filterParts() {
     if (statusFilter && p.status !== statusFilter) return false;
     return true;
   });
+
+  if (sortBy === 'title') {
+    filtered.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+  } else if (sortBy === 'status') {
+    filtered.sort((a, b) => (a.status || '').localeCompare(b.status || ''));
+  } else {
+    filtered.sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+  }
 
   renderPartsList(filtered);
 }
@@ -1947,6 +1971,26 @@ function initPromptsView() {
     filterPrompts();
   });
 
+  const sortSelect = document.getElementById('filter-prompts-sort');
+  if (sortSelect) sortSelect.addEventListener('change', () => filterPrompts());
+
+  document.getElementById('btn-prompts-ai-generate')?.addEventListener('click', () => {
+    openAiChatDrawer();
+    const p = 'Brainstorm 3 unique, high-detail cinematic prompts tailored for this project';
+    appendAiMessage('user', p);
+    sendAiChat(p);
+  });
+
+  document.getElementById('btn-prompt-ai-enhance')?.addEventListener('click', () => {
+    const currentPrompt = document.getElementById('prompt-body')?.value.trim() || '';
+    openAiChatDrawer();
+    const req = currentPrompt
+      ? `Enhance and optimize this prompt for highest visual quality and cinematic detail: "${currentPrompt}"`
+      : 'Help brainstorm an exceptional directive prompt for this project';
+    appendAiMessage('user', req);
+    sendAiChat(req);
+  });
+
   document.getElementById('form-prompt').addEventListener('submit', handlePromptSubmit);
 }
 
@@ -1957,7 +2001,7 @@ async function loadPrompts() {
     state.prompts = await res.json();
     populateCategoryDropdown();
     populateCharacterDropdowns();
-    renderPromptsList(state.prompts);
+    filterPrompts();
     updateSidebarBadges();
   } catch (err) {
     console.error('Failed to load prompts', err);
@@ -2013,12 +2057,13 @@ function populateCharacterDropdowns() {
 }
 
 function filterPrompts() {
-  const query = document.getElementById('filter-prompts-search').value.toLowerCase().trim();
-  const category = document.getElementById('filter-prompts-category').value;
-  const characterId = document.getElementById('filter-prompts-character').value;
-  const favOnly = document.getElementById('filter-prompts-fav').classList.contains('active');
+  const query = document.getElementById('filter-prompts-search')?.value.toLowerCase().trim() || '';
+  const category = document.getElementById('filter-prompts-category')?.value || '';
+  const characterId = document.getElementById('filter-prompts-character')?.value || '';
+  const sortBy = document.getElementById('filter-prompts-sort')?.value || 'recent';
+  const favOnly = document.getElementById('filter-prompts-fav')?.classList.contains('active') || false;
 
-  const filtered = state.prompts.filter((p) => {
+  let filtered = state.prompts.filter((p) => {
     if (query) {
       const inTitle = p.title.toLowerCase().includes(query);
       const inBody = p.body.toLowerCase().includes(query);
@@ -2030,6 +2075,14 @@ function filterPrompts() {
     if (favOnly && !p.is_favorite) return false;
     return true;
   });
+
+  if (sortBy === 'title') {
+    filtered.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+  } else if (sortBy === 'category') {
+    filtered.sort((a, b) => (a.category || '').localeCompare(b.category || ''));
+  } else {
+    filtered.sort((a, b) => (b.id || 0) - (a.id || 0));
+  }
 
   renderPromptsList(filtered);
 }
@@ -2320,17 +2373,17 @@ function initCharactersView() {
     openCharacterModal();
   });
 
-  const searchInput = document.getElementById('filter-characters-search');
-  searchInput.addEventListener('input', () => {
-    const q = searchInput.value.toLowerCase().trim();
-    const filtered = state.characters.filter((c) => {
-      const inName = c.name.toLowerCase().includes(q);
-      const inDesc = c.description && c.description.toLowerCase().includes(q);
-      const inTraits = c.traits && c.traits.toLowerCase().includes(q);
-      return inName || inDesc || inTraits;
-    });
-    renderCharactersList(filtered);
+  document.getElementById('btn-characters-ai-persona')?.addEventListener('click', () => {
+    openAiChatDrawer();
+    const prompt = 'Generate a compelling character persona with visual traits and lore for this project';
+    appendAiMessage('user', prompt);
+    sendAiChat(prompt);
   });
+
+  const searchInput = document.getElementById('filter-characters-search');
+  const sortSelect = document.getElementById('filter-characters-sort');
+  if (searchInput) searchInput.addEventListener('input', () => filterCharacters());
+  if (sortSelect) sortSelect.addEventListener('change', () => filterCharacters());
 
   // Avatar upload handling
   const avatarZone = document.getElementById('character-avatar-zone');
@@ -2364,12 +2417,32 @@ function initCharactersView() {
   document.getElementById('form-character').addEventListener('submit', handleCharacterSubmit);
 }
 
+function filterCharacters() {
+  const q = document.getElementById('filter-characters-search')?.value.toLowerCase().trim() || '';
+  const sortBy = document.getElementById('filter-characters-sort')?.value || 'name';
+
+  let filtered = state.characters.filter((c) => {
+    const inName = c.name.toLowerCase().includes(q);
+    const inDesc = c.description && c.description.toLowerCase().includes(q);
+    const inTraits = c.traits && c.traits.toLowerCase().includes(q);
+    return !q || inName || inDesc || inTraits;
+  });
+
+  if (sortBy === 'name') {
+    filtered.sort((a, b) => a.name.localeCompare(b.name));
+  } else {
+    filtered.sort((a, b) => (b.id || 0) - (a.id || 0));
+  }
+
+  renderCharactersList(filtered);
+}
+
 async function loadCharacters() {
   try {
     const pid = state.activeProjectId || 1;
     const res = await fetch(`/api/characters?project_id=${pid}`);
     state.characters = await res.json();
-    renderCharactersList(state.characters);
+    filterCharacters();
     populateCharacterDropdowns();
     updateSidebarBadges();
   } catch (err) {
@@ -2633,6 +2706,9 @@ function initLinksView() {
   const platformSelect = document.getElementById('filter-links-platform');
   platformSelect.addEventListener('change', () => filterLinks());
 
+  const sortSelect = document.getElementById('filter-links-sort');
+  if (sortSelect) sortSelect.addEventListener('change', () => filterLinks());
+
   document.getElementById('form-link').addEventListener('submit', handleLinkSubmit);
 }
 
@@ -2641,7 +2717,7 @@ async function loadLinks() {
     const pid = state.activeProjectId || 1;
     const res = await fetch(`/api/links?project_id=${pid}`);
     state.links = await res.json();
-    renderLinksList(state.links);
+    filterLinks();
     updateSidebarBadges();
   } catch (err) {
     console.error('Failed to load links', err);
@@ -2649,10 +2725,11 @@ async function loadLinks() {
 }
 
 function filterLinks() {
-  const query = document.getElementById('filter-links-search').value.toLowerCase().trim();
-  const platform = document.getElementById('filter-links-platform').value.toLowerCase();
+  const query = document.getElementById('filter-links-search')?.value.toLowerCase().trim() || '';
+  const platform = document.getElementById('filter-links-platform')?.value.toLowerCase() || '';
+  const sortBy = document.getElementById('filter-links-sort')?.value || 'recent';
 
-  const filtered = state.links.filter((l) => {
+  let filtered = state.links.filter((l) => {
     if (query) {
       const inTitle = l.title && l.title.toLowerCase().includes(query);
       const inUrl = l.url.toLowerCase().includes(query);
@@ -2662,6 +2739,14 @@ function filterLinks() {
     if (platform && l.platform !== platform) return false;
     return true;
   });
+
+  if (sortBy === 'title') {
+    filtered.sort((a, b) => (a.title || a.url).localeCompare(b.title || b.url));
+  } else if (sortBy === 'platform') {
+    filtered.sort((a, b) => (a.platform || '').localeCompare(b.platform || ''));
+  } else {
+    filtered.sort((a, b) => (b.id || 0) - (a.id || 0));
+  }
 
   renderLinksList(filtered);
 }
@@ -2910,7 +2995,36 @@ function initBoardsView() {
     renderDrawerItems();
   });
 
+  const searchInput = document.getElementById('filter-boards-search');
+  const styleSelect = document.getElementById('filter-boards-style');
+  const sortSelect = document.getElementById('filter-boards-sort');
+  if (searchInput) searchInput.addEventListener('input', () => filterBoards());
+  if (styleSelect) styleSelect.addEventListener('change', () => filterBoards());
+  if (sortSelect) sortSelect.addEventListener('change', () => filterBoards());
+
   document.getElementById('form-board').addEventListener('submit', handleBoardSubmit);
+}
+
+function filterBoards() {
+  const query = document.getElementById('filter-boards-search')?.value.toLowerCase().trim() || '';
+  const styleFilter = document.getElementById('filter-boards-style')?.value || '';
+  const sortBy = document.getElementById('filter-boards-sort')?.value || 'updated';
+
+  let filtered = state.boards.filter((b) => {
+    const inName = b.name.toLowerCase().includes(query);
+    const inStyle = b.canvas_style && b.canvas_style.toLowerCase().includes(query);
+    if (query && !inName && !inStyle) return false;
+    if (styleFilter && b.canvas_style !== styleFilter) return false;
+    return true;
+  });
+
+  if (sortBy === 'name') {
+    filtered.sort((a, b) => a.name.localeCompare(b.name));
+  } else {
+    filtered.sort((a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0));
+  }
+
+  renderBoardsList(filtered);
 }
 
 async function loadBoards() {
@@ -2918,7 +3032,7 @@ async function loadBoards() {
     const pid = state.activeProjectId || 1;
     const res = await fetch(`/api/boards?project_id=${pid}`);
     state.boards = await res.json();
-    renderBoardsList(state.boards);
+    filterBoards();
     updateSidebarBadges();
   } catch (err) {
     console.error('Failed to load boards', err);
@@ -3690,10 +3804,22 @@ function initProjectHubView() {
     });
   }
 
+  const btnAiPath = document.getElementById('btn-hub-ai-path');
+  if (btnAiPath) {
+    btnAiPath.addEventListener('click', () => {
+      openAiChatDrawer();
+      const projName = state.activeProject?.name || 'Active Project';
+      const projPath = document.getElementById('hub-project-path')?.textContent?.trim() || 'data/projects/';
+      const prompt = `Analyze project "${projName}" (Storage path: ${projPath}). Review our creative directives, production parts, characters, and assets. Provide strategic recommendations for what to develop next.`;
+      appendAiMessage('user', prompt);
+      sendAiChat(prompt);
+    });
+  }
+
   // 5 Category Directive Cards Navigation
   document.querySelectorAll('.hub-directive-card').forEach((card) => {
     card.addEventListener('click', () => {
-      const target = card.dataset.goto;
+      const target = card.dataset.goto || card.dataset.targetView;
       if (target) {
         if (target === 'parts') {
           const s = document.getElementById('filter-parts-search');
@@ -3702,6 +3828,8 @@ function initProjectHubView() {
           if (t) t.value = '';
           const st = document.getElementById('filter-parts-status');
           if (st) st.value = '';
+          const so = document.getElementById('filter-parts-sort');
+          if (so) so.value = 'order';
         } else if (target === 'prompts') {
           const s = document.getElementById('filter-prompts-search');
           if (s) s.value = '';
@@ -3709,17 +3837,29 @@ function initProjectHubView() {
           if (c) c.value = '';
           const ch = document.getElementById('filter-prompts-character');
           if (ch) ch.value = '';
+          const so = document.getElementById('filter-prompts-sort');
+          if (so) so.value = 'recent';
           const fav = document.getElementById('filter-prompts-fav');
           if (fav) fav.classList.remove('active');
         } else if (target === 'characters') {
           const s = document.getElementById('filter-characters-search');
           if (s) s.value = '';
+          const so = document.getElementById('filter-characters-sort');
+          if (so) so.value = 'name';
         } else if (target === 'links') {
           const s = document.getElementById('filter-links-search');
           if (s) s.value = '';
           const p = document.getElementById('filter-links-platform');
           if (p) p.value = '';
+          const so = document.getElementById('filter-links-sort');
+          if (so) so.value = 'recent';
         } else if (target === 'boards') {
+          const s = document.getElementById('filter-boards-search');
+          if (s) s.value = '';
+          const st = document.getElementById('filter-boards-style');
+          if (st) st.value = '';
+          const so = document.getElementById('filter-boards-sort');
+          if (so) so.value = 'updated';
           const bl = document.getElementById('boards-list-container');
           if (bl) bl.style.display = 'block';
           const cc = document.getElementById('canvas-container');
@@ -4020,6 +4160,15 @@ async function loadSettingsUI() {
     const baseUrlInput = document.getElementById('setting-ai-base-url');
     if (baseUrlInput) baseUrlInput.value = settings.ai_base_url || localStorage.getItem('atelier_ai_base_url') || '';
 
+    const tempInput = document.getElementById('setting-ai-temperature');
+    if (tempInput) tempInput.value = settings.ai_temperature || localStorage.getItem('atelier_ai_temperature') || '0.7';
+
+    const maxTokensInput = document.getElementById('setting-ai-max-tokens');
+    if (maxTokensInput) maxTokensInput.value = settings.ai_max_tokens || localStorage.getItem('atelier_ai_max_tokens') || '2048';
+
+    const sysPromptInput = document.getElementById('setting-ai-system-prompt');
+    if (sysPromptInput) sysPromptInput.value = settings.ai_system_prompt || localStorage.getItem('atelier_ai_system_prompt') || '';
+
     // Layout Mode
     const layoutMode = settings.layout_mode || localStorage.getItem('atelier_layout_mode') || 'sidebar';
     applyLayoutMode(layoutMode, false);
@@ -4098,11 +4247,17 @@ function initSettingsView() {
       const key = keyInput?.value.trim() || '';
       const model = modelInput?.value.trim() || '';
       const baseUrl = baseUrlInput?.value.trim() || '';
+      const temp = document.getElementById('setting-ai-temperature')?.value.trim() || '';
+      const maxTokens = document.getElementById('setting-ai-max-tokens')?.value.trim() || '';
+      const sysPrompt = document.getElementById('setting-ai-system-prompt')?.value.trim() || '';
 
       localStorage.setItem('atelier_ai_provider', provider);
       localStorage.setItem('atelier_ai_key', key);
       localStorage.setItem('atelier_ai_model', model);
       localStorage.setItem('atelier_ai_base_url', baseUrl);
+      localStorage.setItem('atelier_ai_temperature', temp);
+      localStorage.setItem('atelier_ai_max_tokens', maxTokens);
+      localStorage.setItem('atelier_ai_system_prompt', sysPrompt);
 
       try {
         await fetch('/api/settings/bulk', {
@@ -4114,6 +4269,9 @@ function initSettingsView() {
               ai_api_key: key,
               ai_model: model,
               ai_base_url: baseUrl,
+              ai_temperature: temp,
+              ai_max_tokens: maxTokens,
+              ai_system_prompt: sysPrompt,
             },
           }),
         });
@@ -4140,19 +4298,25 @@ function initSettingsView() {
       const key = keyInput?.value.trim() || '';
       const model = modelInput?.value.trim() || '';
       const baseUrl = baseUrlInput?.value.trim() || '';
+      const temp = document.getElementById('setting-ai-temperature')?.value.trim() || '';
+      const maxTokens = document.getElementById('setting-ai-max-tokens')?.value.trim() || '';
+
+      const testPayload = {
+        provider,
+        api_key: key,
+        model,
+        base_url: baseUrl,
+        test_connection: true,
+        messages: [{ role: 'user', content: 'Ping. Reply with "pong".' }],
+      };
+      if (temp) testPayload.temperature = parseFloat(temp);
+      if (maxTokens) testPayload.max_tokens = parseInt(maxTokens, 10);
 
       try {
         const res = await fetch('/api/ai/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            provider,
-            api_key: key,
-            model,
-            base_url: baseUrl,
-            test_connection: true,
-            messages: [{ role: 'user', content: 'Ping. Reply with "pong".' }],
-          }),
+          body: JSON.stringify(testPayload),
         });
 
         if (!res.ok) throw new Error(await res.text());
@@ -4503,6 +4667,36 @@ function updateAiDrawerProviderBadge() {
   }
 }
 
+async function copyToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Fallback below
+    }
+  }
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+  textArea.style.position = 'fixed';
+  textArea.style.top = '-9999px';
+  textArea.style.left = '-9999px';
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  let success = false;
+  try {
+    success = document.execCommand('copy');
+  } catch (err) {
+    console.error('Fallback copy failed', err);
+  } finally {
+    document.body.removeChild(textArea);
+  }
+  return success;
+}
+
+let lastAiUserPrompt = '';
+
 function appendAiMessage(role, content, actions = false) {
   const container = document.getElementById('ai-chat-messages');
   if (!container) return;
@@ -4514,17 +4708,41 @@ function appendAiMessage(role, content, actions = false) {
   bubble.className = 'ai-message-bubble';
 
   if (role === 'assistant') {
-    const escaped = content
+    let escaped = content
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/\n\n/g, '</p><p>')
-      .replace(/\n/g, '<br>');
+      .replace(/>/g, '&gt;');
+
+    // Format markdown elements safely
+    escaped = escaped.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+    escaped = escaped.replace(/`([^`]+)`/g, '<code>$1</code>');
+    escaped = escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    escaped = escaped.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>');
     bubble.innerHTML = `<p>${escaped}</p>`;
 
     if (actions) {
       const actionRow = document.createElement('div');
       actionRow.className = 'ai-message-actions';
+
+      const btnCopy = document.createElement('button');
+      btnCopy.type = 'button';
+      btnCopy.className = 'ai-action-btn';
+      btnCopy.innerHTML = '<i class="fa-solid fa-copy"></i> Copy';
+      btnCopy.title = 'Copy response text to clipboard';
+      btnCopy.addEventListener('click', async () => {
+        const ok = await copyToClipboard(content);
+        if (ok) {
+          btnCopy.classList.add('copied');
+          btnCopy.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
+          setTimeout(() => {
+            btnCopy.classList.remove('copied');
+            btnCopy.innerHTML = '<i class="fa-solid fa-copy"></i> Copy';
+          }, 2000);
+        } else {
+          showToast('Failed to copy to clipboard', 'error');
+        }
+      });
+      actionRow.appendChild(btnCopy);
 
       const btnSavePrompt = document.createElement('button');
       btnSavePrompt.type = 'button';
@@ -4564,6 +4782,40 @@ function appendAiMessage(role, content, actions = false) {
       });
       actionRow.appendChild(btnSavePart);
 
+      const btnAddToProj = document.createElement('button');
+      btnAddToProj.type = 'button';
+      btnAddToProj.className = 'ai-action-btn';
+      btnAddToProj.innerHTML = '<i class="fa-solid fa-folder-plus"></i> Add to Project';
+      btnAddToProj.title = 'Append content to active project';
+      btnAddToProj.addEventListener('click', () => {
+        if (state.activeProject) {
+          openProjectModal(state.activeProject);
+          const descEl = document.getElementById('project-description');
+          if (descEl) {
+            descEl.value = descEl.value ? descEl.value + '\n\n' + content : content;
+          }
+          showToast(`Appended to "${state.activeProject.name}" description`);
+        } else {
+          showToast('No active project selected', 'error');
+        }
+      });
+      actionRow.appendChild(btnAddToProj);
+
+      const btnRegenerate = document.createElement('button');
+      btnRegenerate.type = 'button';
+      btnRegenerate.className = 'ai-action-btn';
+      btnRegenerate.innerHTML = '<i class="fa-solid fa-rotate"></i> Regenerate';
+      btnRegenerate.title = 'Regenerate response for last prompt';
+      btnRegenerate.addEventListener('click', () => {
+        if (lastAiUserPrompt) {
+          appendAiMessage('user', lastAiUserPrompt);
+          sendAiChat(lastAiUserPrompt);
+        } else {
+          showToast('No previous user prompt to regenerate', 'warning');
+        }
+      });
+      actionRow.appendChild(btnRegenerate);
+
       bubble.appendChild(actionRow);
     }
   } else {
@@ -4576,6 +4828,7 @@ function appendAiMessage(role, content, actions = false) {
 }
 
 async function sendAiChat(userText) {
+  lastAiUserPrompt = userText;
   const container = document.getElementById('ai-chat-messages');
   const typingMsg = document.createElement('div');
   typingMsg.className = 'ai-message assistant';
@@ -4588,6 +4841,12 @@ async function sendAiChat(userText) {
   const apiKey = localStorage.getItem('atelier_ai_key') || '';
   const model = localStorage.getItem('atelier_ai_model') || '';
   const baseUrl = localStorage.getItem('atelier_ai_base_url') || '';
+  const tempStr = localStorage.getItem('atelier_ai_temperature');
+  const temperature = tempStr ? parseFloat(tempStr) : undefined;
+  const maxTokensStr = localStorage.getItem('atelier_ai_max_tokens');
+  const max_tokens = maxTokensStr ? parseInt(maxTokensStr, 10) : undefined;
+  const customDirective = localStorage.getItem('atelier_ai_system_prompt') || '';
+  const customContext = customDirective ? ` Custom Directives: ${customDirective}.` : '';
 
   const projectContext = state.activeProject
     ? `Active Project: "${state.activeProject.name}" (Status: ${state.activeProject.status}, Description: ${state.activeProject.description || 'None'}).`
@@ -4596,7 +4855,7 @@ async function sendAiChat(userText) {
   const messages = [
     {
       role: 'system',
-      content: `You are Atelier AI, a creative studio assistant for social media management, cinematic production, prompts, and visual character lore. ${projectContext} Keep responses focused, structured, and actionable.`,
+      content: `You are Atelier AI, a creative studio assistant for social media management, cinematic production, prompts, and visual character lore. ${projectContext}${customContext} Keep responses focused, structured, and actionable.`,
     },
     {
       role: 'user',
@@ -4604,17 +4863,21 @@ async function sendAiChat(userText) {
     },
   ];
 
+  const payload = {
+    provider,
+    api_key: apiKey,
+    model,
+    base_url: baseUrl,
+    messages,
+  };
+  if (temperature !== undefined && !isNaN(temperature)) payload.temperature = temperature;
+  if (max_tokens !== undefined && !isNaN(max_tokens)) payload.max_tokens = max_tokens;
+
   try {
     const res = await fetch('/api/ai/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        provider,
-        api_key: apiKey,
-        model,
-        base_url: baseUrl,
-        messages,
-      }),
+      body: JSON.stringify(payload),
     });
 
     typingMsg.remove();

@@ -2,6 +2,38 @@
 
 All notable changes to Atelier will be documented in this file.
 
+## [0.4.4] - 2026-09-10
+
+### Added & Redesigned
+- **Filter Bars Space Efficiency & Single-Line Unified Control Bars**:
+  - Overhauled filter bars across all primary views (Projects, Parts, Prompts, Characters, Links, Boards) from multi-line space-consuming forms into ultra-compact, sleek single-line unified control bars with horizontal overflow protection.
+  - Reduced vertical footprint: unified surface container (`var(--bg-card)`) with 1px subtle borders, 6px radius, compact 30px inputs/selects, and tightened header/filter bar margins.
+  - Implemented dense select dropdowns, inline search inputs with integrated vector magnifying glass icons, and compact toggle/filter pills.
+  - Completed sort controls across all 6 views: added sorting to Parts (`Timeline Order`, `Title A-Z`, `Status`), Prompts (`Recently Added`, `Title A-Z`, `Category`), Characters (`Name A-Z`, `Recently Added`), Links (`Recently Added`, `Title A-Z`, `Platform`), Boards (`Recently Updated`, `Name A-Z`), and Projects (`Recently Updated`, `Name A-Z`, `Completion %`).
+  - Streamlined Unified Search & Tag Cloud view with compact input padding and dense filter pills.
+- **AI Integration UI Compliance & Feature Expansion**:
+  - **Hub Banner & Path Integration**: Added dedicated inline AI Project Directives & Analysis button (`#btn-hub-ai-path`) directly inside the project folder path row with automated project analysis prompts; enhanced `#btn-hub-open-ai` with crisp `.btn-hub-ai` styling and flex container alignment.
+  - **Parts AI Scene Generator**: Added quick "AI Scenes" action button (`#btn-parts-ai-scene`) to Production Parts header, completing AI quick actions across all creative repository views (Prompts, Characters, Parts, Hub).
+  - **Sidebar AI Assistant Trigger**: Fully styled `#btn-sidebar-ai` with theme tokens and automatic collapsed sidebar handling (icon-only centered mode with hidden label).
+  - **Strict Design System Compliance**:
+    - Purged hardcoded accent colors (`#ec4899`) from `#dock-btn-ai`, `.ai-sparkle-icon`, `.connection-status-pill`, `.canvas-inline-editor`, and `.svg-selection-outline`, standardizing on theme tokens `var(--primary)`, `var(--success)`, `var(--danger)`, and `var(--border-focus)`.
+    - Fixed active dock AI button text color (`.dock-btn-ai.active`) to use `var(--primary-text)` ensuring high contrast against primary background.
+    - Defined default solid surface and border styling on `.connection-status-pill` for pending test states.
+    - Enforced max 8px border-radius across all AI components (chat bubbles 6px, buttons 4px, inputs 4px/6px, badges 4px).
+    - Guaranteed 100% zero gradients (`linear-gradient` / `radial-gradient` = 0) with solid surfaces and crisp 1px borders.
+    - Verified strictly zero emojis across all code, markup, and generated messages (crisp Font Awesome 6 icons throughout).
+  - **AI Model Parameters & Settings**:
+    - Added configurable Temperature (`0.0` - `1.0`), Max Tokens, and Custom Studio Directives / System Prompt inputs to the AI Settings card in `#view-settings`.
+    - Integrated parameters into local storage, `/api/settings/bulk` persistence, and `/api/ai/chat` request payloads.
+  - **AI Actions in Chat Drawer & Modals**:
+    - Expanded AI chat response actions: Copy to clipboard with secure fallback (`document.execCommand`), Save as Prompt, Save as Character, Add Scene Part, Add to Project (appends to active project with toast notification), and Regenerate.
+    - Added clean markdown formatting (bold, code blocks `<pre><code>`, and inline `<code>`) within assistant chat bubbles.
+    - Added quick AI generation entrypoints: "AI Generate" in Prompts, "AI Persona" in Characters, "AI Scenes" in Parts, and "AI Enhance" in Prompt modal.
+- **Bug Fixes & UI Stability**:
+  - Fixed prompt filter persistence bug where `loadPrompts()` bypassed active filters and rendered unfiltered items.
+  - Fixed Project Hub directive card navigation resetting filters after view initialization.
+  - Fixed AI drawer project context desynchronization when switching active projects via workspace dropdown.
+
 ## [0.4.3] - 2026-09-10
 
 ### Added

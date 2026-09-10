@@ -61,6 +61,28 @@ Atelier is a local-only, single-user content sketchbook and visual planning canv
   - **Element Properties Tab & Floating Inspector**: Real-time two-way editing of X, Y, W, H, stroke color, fill color, stroke width, dashed style, shape text, font size, and layer stacking in `#canvas-properties-panel` and `#canvas-drawer` (Properties tab).
   - **Retina 2x PNG & Vector SVG Export**: High-res 2x retina HTML5 canvas offscreen renderer captures backdrop, vector drawings, cards, and typography into a downloadable PNG file; standalone vector SVG generator produces valid `.svg` export alongside JSON archive export.
   - **Clipboard Copy/Paste & Image Drag/Paste**: System paste listener intercepts images and uploads via `POST /api/upload`, creating a reference link and pinning to canvas. Plain text pastes as sticky notes. Internal `Ctrl+C`, `Ctrl+V`, `Ctrl+D` shortcuts copy, paste, and duplicate elements with automatic offset.
+- **Phase 12: Filter Bars Space Efficiency & AI Design System Compliance (v0.4.4)**:
+  - **Single-Line Unified Filter Control Bars**:
+    - Transformed sprawling filter forms across Projects, Parts, Prompts, Characters, Links, and Boards into single-line, 38px unified control bars with horizontal scroll overflow protection.
+    - Unified container background (`var(--bg-card)`), 1px subtle borders, 6px border-radius, compact 30px inputs/selects, integrated vector search icons, and compact pill buttons.
+    - Full sort suite across all 6 views: Parts (`Timeline Order`, `Title A-Z`, `Status`), Prompts (`Recently Added`, `Title A-Z`, `Category`), Characters (`Name A-Z`, `Recently Added`), Links (`Recently Added`, `Title A-Z`, `Platform`), Boards (`Recently Updated`, `Name A-Z`), and Projects (`Recently Updated`, `Name A-Z`, `Completion %`).
+    - Compacted Search View workbench padding, dense pills, and header margins (`margin-bottom: 0.85rem`).
+  - **AI UI Design System Compliance**:
+    - Zero emojis verified across all AI tools, templates, and buttons.
+    - Max 8px border-radius enforced on all AI components (chat bubbles 6px, buttons 4px, inputs 4px/6px, badges 4px).
+    - Strictly zero gradients (`linear-gradient` / `radial-gradient` = 0) with solid surfaces.
+    - Purged hardcoded accent colors (`#ec4899`), standardizing on theme tokens `var(--primary)`, `var(--success)`, `var(--danger)`, `var(--border-focus)`.
+    - Fixed high-contrast text color on active dock AI button (`.dock-btn-ai.active`).
+    - Defined solid surface and subtle border for base `.connection-status-pill`.
+    - Styled sidebar AI trigger `#btn-sidebar-ai` with collapsed icon-only mode support.
+    - Added inline AI button `#btn-hub-ai-path` inside project folder path row with automated project analysis prompts; enhanced `#btn-hub-open-ai` with `.btn-hub-ai` and flex alignment.
+    - Added quick "AI Scenes" action button (`#btn-parts-ai-scene`) to Production Parts header.
+    - Added configurable Temperature, Max Tokens, and Custom Studio Directives in Settings.
+    - Added response action buttons: Copy (with secure context fallback), Add to Project (with toast notification), Regenerate, Save Prompt, Save Character, Add Part.
+    - Added markdown formatting (bold, `<pre><code>` blocks, inline `<code>`) within assistant chat bubbles.
+    - Fixed prompt filter persistence bug where `loadPrompts()` bypassed active filters.
+    - Fixed active project context synchronization in AI drawer during workspace switches.
+    - Fixed Project Hub directive card navigation filter reset ordering.
 
 ## Key Rules & Invariants
 - **Markdown file restriction**: Exactly 4 markdown files permitted in the repository: `README.md`, `changelog.md`, `memory.md`, and `agent.md`.
