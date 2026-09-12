@@ -2,6 +2,30 @@
 
 All notable changes to Atelier will be documented in this file.
 
+## [0.5.0] - 2026-09-12
+
+### Added
+- **Installable Windows Build (Setup Wizard .exe)**:
+  - Created official Inno Setup 6 installer (`dist/Atelier-Setup-v0.1.0-x64.exe`, 5.12 MB, LZMA2/max compression).
+  - Modern setup wizard with per-user installation (`%LOCALAPPDATA%\Programs\Atelier`, requiring no administrator privileges) and optional all-users mode.
+  - Generates Start Menu shortcut, optional Desktop shortcut, and clean Windows uninstaller registered in `Settings > Apps > Installed apps`.
+  - Post-install option to launch Atelier immediately upon setup completion.
+- **Zero-Install Portable Windows Release (.zip)**:
+  - Packaged standalone portable archive (`dist/Atelier-v0.1.0-windows-x64-portable.zip`, 4.50 MB) containing `atelier.exe`, `static/`, `atelier.ico`, `README.md`, and one-click `run-atelier.bat` launcher.
+- **Embedded Windows Icon & Executable Metadata**:
+  - Generated multi-resolution Windows icon `installer/atelier.ico` (16x16, 24x24, 32x32, 48x48, 64x64, 128x128, 256x256).
+  - Configured `winres` in `Cargo.toml` and `build.rs` to embed application icon, Product Name (`Atelier`), Description (`Atelier - Creative Social Media & Content Planning Studio`), File Version (`0.1.0`), and Copyright into `atelier.exe`.
+- **Smart Path & Storage Architecture**:
+  - Implemented executable-relative path detection in `src/main.rs`: automatically locates `static/` bundled next to the binary or in the working directory.
+  - User data separation: when installed, project databases and uploads are cleanly placed in `%LOCALAPPDATA%\Atelier\data` (or `%APPDATA%\Atelier\data`), ensuring user projects are completely safe and preserved during app updates or re-installations.
+  - Portable mode: automatically uses `./data` next to the executable if `./data` exists or when `--portable` is specified.
+  - Custom data directory override via `--data-dir <PATH>` or `ATELIER_DATA_DIR` environment variable.
+- **Automatic Browser Launch**:
+  - When launched, `atelier.exe` automatically opens the studio interface in the user's default browser (`cmd /C start http://localhost:8080`).
+  - Added CLI flags: `--port <PORT>`, `--data-dir <PATH>`, `--portable`, `--no-browser`, `--headless`, `-h`/`--help`, `-v`/`--version`.
+- **Automated Build Script**:
+  - Added `build-windows-installer.ps1` to automate release compilation, Inno Setup installer packaging, portable ZIP compression, and SHA256 verification.
+
 ## [0.4.4] - 2026-09-10
 
 ### Added & Redesigned

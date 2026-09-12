@@ -111,6 +111,47 @@ cargo test
 
 ---
 
+## Windows Desktop Installation & Releases
+
+Atelier provides both a full Windows Setup Wizard and a zero-install portable package in `dist/`:
+
+### 1. Windows Installer (`Atelier-Setup-v0.1.0-x64.exe`)
+- **Install**: Run `dist\Atelier-Setup-v0.1.0-x64.exe`.
+- **Location**: Installed to `%LOCALAPPDATA%\Programs\Atelier` without requiring administrator privileges (or `C:\Program Files\Atelier` if installed for all users).
+- **Shortcuts**: Automatically creates Start Menu and Desktop shortcuts with embedded studio application icons.
+- **Safety**: User data (projects, SQLite database, uploads) is stored in `%LOCALAPPDATA%\Atelier\data`, ensuring your creative work is preserved across updates.
+- **Uninstall**: Standard uninstaller registered in Windows `Settings > Apps > Installed apps`.
+
+### 2. Portable Package (`Atelier-v0.1.0-windows-x64-portable.zip`)
+- **Extract**: Unzip `dist\Atelier-v0.1.0-windows-x64-portable.zip` anywhere (e.g. on external SSD/USB).
+- **Launch**: Double-click `run-atelier.bat` or run `atelier.exe --portable`.
+- **Storage**: Automatically keeps all project data in `./data` next to the executable.
+
+### 3. Building the Windows Installer from Source
+```powershell
+# Build release binary, Windows installer, and portable zip in one command:
+powershell -ExecutionPolicy Bypass -File .\build-windows-installer.ps1
+```
+Build outputs are generated in the `dist/` directory:
+- `dist/Atelier-Setup-v0.1.0-x64.exe`
+- `dist/Atelier-v0.1.0-windows-x64-portable.zip`
+
+### Command-Line Options
+```text
+atelier [OPTIONS]
+
+OPTIONS:
+  --port <PORT>        Specify HTTP server port (default: 8080 or PORT env)
+  --data-dir <PATH>    Specify custom data directory (default: %LOCALAPPDATA%/Atelier/data or ./data)
+  --portable           Force portable mode (stores data in ./data next to executable)
+  --no-browser         Do not open the default web browser on launch
+  --headless           Same as --no-browser
+  -h, --help           Print help information
+  -v, --version        Print version information
+```
+
+---
+
 ## Architecture
 
 Atelier runs as a single, highly-optimized self-contained binary:

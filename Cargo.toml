@@ -35,3 +35,6 @@ mime_guess = "2.0"
 tower = { version = "0.4", features = ["util"] }
 http-body-util = "0.1"
 mime_guess = "2.0"
+
+[build-dependencies]
+winres = "0.1"

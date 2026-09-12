@@ -83,6 +83,13 @@ Atelier is a local-only, single-user content sketchbook and visual planning canv
     - Fixed prompt filter persistence bug where `loadPrompts()` bypassed active filters.
     - Fixed active project context synchronization in AI drawer during workspace switches.
     - Fixed Project Hub directive card navigation filter reset ordering.
+- **Phase 13: Installable Windows Release & Desktop Packaging (v0.5.0)**:
+  - **Inno Setup Windows Installer**: `dist/Atelier-Setup-v0.1.0-x64.exe` (5.12 MB, LZMA2/max) installs to `%LOCALAPPDATA%\Programs\Atelier` without administrator privileges (or `Program Files` if run as admin). Generates Start Menu group, desktop shortcut, and uninstaller registered in Windows Settings Apps.
+  - **Portable Windows Package**: `dist/Atelier-v0.1.0-windows-x64-portable.zip` (4.50 MB) containing `atelier.exe`, `static/`, `atelier.ico`, `README.md`, and one-click `run-atelier.bat`.
+  - **Embedded Windows Resources**: Multi-resolution `installer/atelier.ico` (16x16 to 256x256) embedded in `atelier.exe` via `winres` and `build.rs`, providing native application icon and version properties in File Explorer, Alt+Tab, and Taskbar.
+  - **Smart Storage Resolution**: `src/main.rs` resolves `static/` relative to `current_exe()`. User data is isolated to `%LOCALAPPDATA%\Atelier\data` when installed, preserving project databases across app updates and uninstalls. Supports portable `./data`, `--portable`, `--data-dir <PATH>`, and `ATELIER_DATA_DIR`.
+  - **Auto-Browser Launch**: Automatically opens the studio in default browser upon launch (`cmd /C start http://localhost:{port}`), with `--no-browser` and `--headless` suppression flags.
+  - **Build Automation**: `build-windows-installer.ps1` automates release build, Inno Setup compiler (`ISCC.exe`), portable zip generation, and SHA256 checksums.
 
 ## Key Rules & Invariants
 - **Markdown file restriction**: Exactly 4 markdown files permitted in the repository: `README.md`, `changelog.md`, `memory.md`, and `agent.md`.
