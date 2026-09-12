@@ -27,6 +27,9 @@ Optimize every decision for: low idle memory, fast local startup, zero external 
 ```
 atelier/
   Cargo.toml
+  build.rs             # Windows resource compiler (embeds icon and exe metadata)
+  build-windows-installer.ps1 # release build, Inno Setup compiler & portable packager
+  installer/           # Inno Setup .iss, icon generator, .ico, and portable .bat launcher
   src/
     main.rs              # server setup, routing, shared AppState (db pool, paths), error handling
     db.rs                # connection pool initialization & idempotent schema migrations
@@ -52,6 +55,7 @@ atelier/
     app.js               # application router, project hub, AI drawer, state management
     canvas.js            # hybrid corkboard + SVG diagramming engine (pan/zoom, tools, connectors)
     style.css            # styling & design tokens for global themes, compound panels, and ambient fade
+  dist/                # generated Windows installer & portable zip (gitignored)
   data/
     atelier.db          # created on first run (gitignored)
     uploads/            # uploaded character avatars and board images (gitignored)
@@ -625,4 +629,49 @@ The board uses an SVG container and an HTML cards container stacked inside a mas
   - Integration tests in `tests/api_tests.rs` for settings CRUD, activity feed, and AI proxy validation.
   - Verification of Compound Modals, Project Card actions, Project Hub navigation, AI Assistant drawer, canvas text/cursors, and zero-gradient compliance.
 
+### Phase 11: Extended Vector Suite, Canvas Affordances, Context Menu & Clipboard (v0.4.3)
+- [x] **11.1 Modular Shapes Flyout Popover**:
+  - Expandable shapes popover (`#shapes-flyout`) supporting Rectangle, Circle, Triangle, Diamond, Star, Line, and Arrow.
+  - Keyboard shortcuts `R`, `O`, `L`, `A` for direct tool selection.
+- [x] **11.2 Text Inside Geometric Shapes**:
+  - Center-anchored SVG `<text>` with multi-line word wrap and contrast fill computation inside shapes.
+  - Double-clicking opens inline textarea editor anchored to shape bounds.
+- [x] **11.3 Hover Selectable Affordances**:
+  - Crisp dashed borders and subtle glow on hovering cards and SVG elements (`.board-card:hover`, `.canvas-svg-item:hover`).
+- [x] **11.4 Stationary Right-Click Context Menu**:
+  - Custom contextual action menu on stationary right-click (< 4px movement) for cards, vector shapes, lines, text, and canvas background, while preserving right-click drag pan.
+- [x] **11.5 Element Properties Inspector Drawer**:
+  - Live two-way property editor in `#canvas-properties-panel` and `#canvas-drawer` (Properties tab) for coordinates, dimensions, strokes, fills, dash style, text labels, and z-index.
+- [x] **11.6 High-Resolution PNG & Vector SVG Export**:
+  - 2x retina offscreen HTML5 canvas PNG export and valid standalone `.svg` vector export alongside JSON export.
+- [x] **11.7 Clipboard Copy/Paste & Image Pasting**:
+  - In-app `Ctrl+C`, `Ctrl+V`, `Ctrl+D` shortcuts with cursor offset.
+  - System clipboard paste listener (`window.addEventListener('paste')`) and drag-and-drop: uploads image files to `/api/upload` and pins cards. Plain text pastes as sticky notes.
 
+### Phase 12: Filter Bars Space Efficiency & AI UI Design System Compliance (v0.4.4)
+- [x] **12.1 Single-Line Unified Filter Control Bars**:
+  - Compact 38px unified control bars across Projects, Parts, Prompts, Characters, Links, and Boards with horizontal overflow protection.
+  - Full sort suite across all 6 views with integrated vector search inputs and dense pills.
+- [x] **12.2 AI UI Design System Compliance**:
+  - Purged hardcoded accent colors (`#ec4899`), standardizing on theme tokens `var(--primary)`, `var(--success)`, `var(--danger)`.
+  - Max 8px border-radius and strictly zero gradients verified across all AI panels, chat bubbles, inputs, and buttons.
+  - Zero emojis verified across all AI tools and messages.
+- [x] **12.3 Contextual AI Path & Scene Actions**:
+  - Dedicated `#btn-hub-ai-path` inside project folder path row with project analysis prompts.
+  - Added `#btn-parts-ai-scene` action button to Production Parts header.
+  - Configurable Temperature, Max Tokens, and Custom Studio Directives in Settings.
+
+### Phase 13: Installable Windows Release & Desktop Packaging (v0.5.0)
+- [x] **13.1 Inno Setup Windows Installer**:
+  - Configured `installer/atelier.iss` compiling `dist/Atelier-Setup-v0.1.0-x64.exe` (5.12 MB, LZMA2/max).
+  - Installs to `%LOCALAPPDATA%\Programs\Atelier` without administrator privileges, generating Start Menu group, desktop shortcut, and registered uninstaller.
+- [x] **13.2 Zero-Install Portable Windows Package**:
+  - Packaged `dist/Atelier-v0.1.0-windows-x64-portable.zip` (4.50 MB) with `atelier.exe`, `static/`, `atelier.ico`, `README.md`, and one-click `run-atelier.bat`.
+- [x] **13.3 Native Windows Resources & Metadata**:
+  - Multi-resolution icon `installer/atelier.ico` embedded via `winres` and `build.rs` into `atelier.exe`.
+  - Windows file version, description, and legal copyright properties embedded.
+- [x] **13.4 Smart Storage Resolution & Auto-Browser Launch**:
+  - `src/main.rs` resolves `static/` relative to `current_exe()`. User data isolated to `%LOCALAPPDATA%\Atelier\data` in installed mode, preserving databases across upgrades; portable `./data` mode preserved.
+  - Auto-launches default browser to `http://localhost:8080` on launch with `--no-browser` and `--headless` flags.
+- [x] **13.5 Build Automation**:
+  - `build-windows-installer.ps1` automates release build, Inno Setup compilation, portable archive packaging, and SHA256 checksums.
