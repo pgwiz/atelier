@@ -379,6 +379,22 @@ function initModals() {
       const dropdown = document.getElementById('project-switcher-dropdown');
       if (dropdown) dropdown.classList.remove('open');
     }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      const openModalEl = document.querySelector('.modal-overlay.open');
+      if (openModalEl) {
+        const form = openModalEl.querySelector('form');
+        if (form) {
+          e.preventDefault();
+          form.requestSubmit();
+        } else {
+          const primaryBtn = openModalEl.querySelector('.modal-footer .btn-primary, .modal-footer .btn-danger, #btn-execute-transfer, #btn-confirm-proceed');
+          if (primaryBtn) {
+            e.preventDefault();
+            primaryBtn.click();
+          }
+        }
+      }
+    }
   });
 }
 
@@ -3142,11 +3158,96 @@ function exitCanvasView() {
   loadBoards();
 }
 
+const RANDOM_BOARD_NAMES = [
+  "Episode 1 Visual Pitch",
+  "Wardrobe & Costume Diagram",
+  "Architectural Concept Board",
+  "Spatial Planning Wireframe",
+  "Cinematic Mood & Tone",
+  "Editorial Brand Direction",
+  "Production Set Design",
+  "Material Palette Study",
+  "Lighting & Atmosphere Map",
+  "Exhibition Flow Layout"
+];
+
+function randomizeBoardName() {
+  const input = document.getElementById('board-name');
+  if (!input) return;
+  const current = input.value.trim();
+  const pool = RANDOM_BOARD_NAMES.filter((n) => n !== current);
+  const chosen = pool[Math.floor(Math.random() * pool.length)] || RANDOM_BOARD_NAMES[0];
+  input.value = chosen;
+  updateBoardModalPreview();
+  input.focus();
+}
+
+function applyBoardPreset(name, style, theme) {
+  const nameInput = document.getElementById('board-name');
+  const styleSelect = document.getElementById('board-style');
+  const themeSelect = document.getElementById('board-theme');
+  if (nameInput) nameInput.value = name;
+  if (styleSelect) styleSelect.value = style;
+  if (themeSelect) themeSelect.value = theme;
+  updateBoardModalPreview();
+  if (nameInput) nameInput.focus();
+}
+
+function updateBoardModalPreview() {
+  const nameInput = document.getElementById('board-name');
+  const styleSelect = document.getElementById('board-style');
+  const themeSelect = document.getElementById('board-theme');
+
+  const titleDisplay = document.getElementById('board-preview-title');
+  const previewCanvas = document.getElementById('board-preview-canvas');
+  const headerBar = document.getElementById('board-preview-header-bar');
+  const swatch = document.getElementById('board-preview-accent-swatch');
+  const themeBadge = document.getElementById('board-preview-theme-badge');
+  const charCounter = document.getElementById('board-name-counter');
+
+  if (!nameInput) return;
+
+  const val = nameInput.value.trim();
+  if (titleDisplay) {
+    titleDisplay.textContent = val !== '' ? val : 'Untitled Planning Board';
+  }
+
+  if (charCounter) {
+    charCounter.textContent = `${nameInput.value.length}/50`;
+    charCounter.classList.toggle('visible', nameInput.value.length > 0);
+  }
+
+  const selectedGrid = styleSelect ? styleSelect.value : 'dot-grid';
+  if (previewCanvas) {
+    previewCanvas.className = `board-preview-canvas ${selectedGrid}`;
+  }
+
+  const selectedTheme = themeSelect ? themeSelect.value : 'default';
+  const themeInfoMap = {
+    'default': { bar: 'var(--primary)', badge: 'Default' },
+    'dark': { bar: '#38bdf8', badge: 'Dark Slate' },
+    'light': { bar: '#0284c7', badge: 'Crisp Light' },
+    'sepia': { bar: '#9a442c', badge: 'Warm Sepia' },
+    'pastel': { bar: '#4a5d4e', badge: 'Sage Pastel' },
+    'cyberpunk': { bar: '#f43f5e', badge: 'Cyberpunk' }
+  };
+  const themeInfo = themeInfoMap[selectedTheme] || themeInfoMap['default'];
+
+  if (headerBar) headerBar.style.backgroundColor = themeInfo.bar;
+  if (swatch) swatch.style.backgroundColor = themeInfo.bar;
+  if (themeBadge) themeBadge.textContent = themeInfo.badge;
+}
+
 function openBoardModal() {
-  document.getElementById('board-name').value = '';
-  document.getElementById('board-style').value = 'dot-grid';
-  document.getElementById('board-theme').value = 'default';
+  const nameInput = document.getElementById('board-name');
+  const styleSelect = document.getElementById('board-style');
+  const themeSelect = document.getElementById('board-theme');
+  if (nameInput) nameInput.value = '';
+  if (styleSelect) styleSelect.value = 'dot-grid';
+  if (themeSelect) themeSelect.value = 'default';
+  updateBoardModalPreview();
   openModal('modal-board');
+  if (nameInput) setTimeout(() => nameInput.focus(), 50);
 }
 
 async function handleBoardSubmit(e) {
@@ -3157,6 +3258,11 @@ async function handleBoardSubmit(e) {
     canvas_style: document.getElementById('board-style').value,
     theme: document.getElementById('board-theme').value,
   };
+
+  if (!payload.name) {
+    showToast('Board name is required', 'error');
+    return;
+  }
 
   try {
     const res = await fetch('/api/boards', {

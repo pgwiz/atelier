@@ -691,3 +691,24 @@ The board uses an SVG container and an HTML cards container stacked inside a mas
 - [x] **14.3 Installer & Portable Package Integration**:
   - Updated `installer/atelier.iss`, `build-windows-installer.ps1`, and `run-atelier.bat` to bundle and launch `atelier-launcher.exe`.
   - Recompiled installer (`dist/Atelier-Setup-v0.1.0-x64.exe`) and portable zip (`dist/Atelier-v0.1.0-windows-x64-portable.zip`).
+
+### Phase 15: Board Creation Modal & Modal Design System Overhaul, Vertical Zoom Controls & Vector Shape Resizing (v0.5.2)
+- [x] **15.1 Dynamic Board Creation Modal (`#modal-board`)**:
+  - Adopted compact layout template: icon badge (`.modal-icon-badge`), section headers (`.modal-section-header`) with required indicator, board name input with inline Randomize button and live character counter (`0/50`).
+  - Dense two-column grid for canvas grid style (Blank Canvas, Dot Grid, Square Grid, Isometric Grid, Corkboard) and studio theme.
+  - Quick-start board presets ("Visual Pitch", "Wardrobe Diagram", "Architectural Layout") applying name, backdrop, and theme instantly.
+  - Live SVG mini-canvas preview box (`#board-preview-canvas`) reflecting title, grid pattern, and accent swatches in real time without gradients.
+  - Keyboard shortcut footer (`Ctrl + Enter` to submit, Cancel / Create Board buttons).
+- [x] **15.2 Unified Modal Design System Across Studio**:
+  - Standardized compound layout across all dialogs (Prompts, Characters, Links, Projects, Parts, Addons, Merge, Transfer, Media Viewer, Confirm) with theme variable inheritance (`dark`, `light`, `sepia`, `pastel`, `cyberpunk`).
+  - Global `Ctrl+Enter` shortcut support across all modal forms.
+- [x] **15.3 Vertical Canvas Zoom Controls**:
+  - Re-oriented `#canvas-zoom-controls` in `static/index.html` and `static/style.css` vertically (`flex-direction: column`, stacked: `+`, zoom indicator, `-`, divider, `1:1`, `Fit`).
+- [x] **15.4 Interactive Vector Shape Resizing & Enlargement**:
+  - Added 8 interactive bounding-box resize handles (`nw`, `n`, `ne`, `e`, `se`, `s`, `sw`, `w`) for shapes (`rect`, `ellipse`, `triangle`, `diamond`, `star`) and 2 endpoint handles (`p1`, `p2`) for lines/arrows in `static/canvas.js`.
+  - Zoom-independent handle sizing, cursor tracking, pointer capture, and smooth real-time drag scaling.
+  - Live bidirectional synchronization with the canvas properties panel (`syncGeometryInputs` and live `input`/`change` listeners).
+  - Isolated `dblclick` bubbling on handles to prevent accidental text editing during resize gestures.
+  - Auto-centers attached shape text during resizing.
+  - Single-listener form submission protection preventing duplicate board creation.
+

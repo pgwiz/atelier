@@ -48,6 +48,11 @@ class AtelierCanvas {
     this.isDraggingSvg = false;
     this.svgDragLastWorldPos = null;
 
+    this.isResizingSvg = false;
+    this.resizingSvgHandle = null;
+    this.resizingSvgElement = null;
+    this.svgResizeStart = null;
+
     // Debounce timers
     this.cameraSaveTimer = null;
     this.drawingSaveTimer = null;
@@ -452,6 +457,20 @@ class AtelierCanvas {
       this.viewport.style.cursor = 'grabbing';
     } else if (this.isSpacePressed) {
       this.viewport.style.cursor = 'grab';
+    } else if (this.isResizingSvg && this.resizingSvgHandle) {
+      const cursorMap = {
+        nw: 'nwse-resize',
+        se: 'nwse-resize',
+        ne: 'nesw-resize',
+        sw: 'nesw-resize',
+        n: 'ns-resize',
+        s: 'ns-resize',
+        e: 'ew-resize',
+        w: 'ew-resize',
+        p1: 'crosshair',
+        p2: 'crosshair',
+      };
+      this.viewport.style.cursor = cursorMap[this.resizingSvgHandle] || 'default';
     } else if (this.currentTool === 'pen' || ['rect', 'ellipse', 'triangle', 'diamond', 'star', 'line', 'arrow', 'connector'].includes(this.currentTool)) {
       this.viewport.style.cursor = 'crosshair';
     } else if (this.currentTool === 'text') {
@@ -511,6 +530,9 @@ class AtelierCanvas {
       this.activeInlineEditor.editor.style.top = `${screenPos.y - rect.top - 4}px`;
       const fontSize = Math.max(12, Math.round(18 * this.zoom));
       this.activeInlineEditor.editor.style.fontSize = `${fontSize}px`;
+    }
+    if (this.selectedElement) {
+      this.renderSvgSelectionOutline();
     }
     this.debounceSaveCamera();
   }
@@ -745,6 +767,15 @@ class AtelierCanvas {
     const worldPos = this.screenToWorld(e.clientX, e.clientY);
 
     if (this.currentTool === 'select') {
+      const resizeHandle = e.target.closest('.svg-resize-handle');
+      if (resizeHandle && resizeHandle.dataset.handleType && this.selectedElement) {
+        const elem = this.drawingData.find((d) => d.id === this.selectedElement);
+        if (elem) {
+          this.startSvgResize(elem, resizeHandle.dataset.handleType, e);
+          return;
+        }
+      }
+
       const targetSvg = e.target.closest('#canvas-svg path, #canvas-svg rect, #canvas-svg ellipse, #canvas-svg line, #canvas-svg polygon, #canvas-svg text');
       if (targetSvg && targetSvg.id && targetSvg.id !== 'canvas-grid-pattern' && this.drawingData.some((d) => d.id === targetSvg.id)) {
         this.selectSvgElement(targetSvg.id);
@@ -754,7 +785,7 @@ class AtelierCanvas {
         return;
       }
 
-      if (!e.target.closest('.board-card') && !targetSvg) {
+      if (!e.target.closest('.board-card') && !targetSvg && !resizeHandle) {
         this.deselectCard();
         this.deselectSvgElement();
         this.closeContextMenu();
@@ -798,6 +829,85 @@ class AtelierCanvas {
 
     const worldPos = this.screenToWorld(e.clientX, e.clientY);
 
+    if (this.isResizingSvg && this.resizingSvgElement && this.svgResizeStart) {
+      const elem = this.resizingSvgElement;
+      const start = this.svgResizeStart;
+      const dx = worldPos.x - start.worldPos.x;
+      const dy = worldPos.y - start.worldPos.y;
+      const handle = this.resizingSvgHandle;
+
+      if (['rect', 'triangle', 'diamond', 'star'].includes(start.type)) {
+        let newX = start.x;
+        let newY = start.y;
+        let newW = start.w;
+        let newH = start.h;
+
+        if (handle.includes('e')) {
+          newW = Math.max(15, start.w + dx);
+        }
+        if (handle.includes('w')) {
+          newW = Math.max(15, start.w - dx);
+          newX = start.x + (start.w - newW);
+        }
+        if (handle.includes('s')) {
+          newH = Math.max(15, start.h + dy);
+        }
+        if (handle.includes('n')) {
+          newH = Math.max(15, start.h - dy);
+          newY = start.y + (start.h - newH);
+        }
+
+        elem.x = Math.round(newX);
+        elem.y = Math.round(newY);
+        elem.w = Math.round(newW);
+        elem.h = Math.round(newH);
+      } else if (start.type === 'ellipse') {
+        const startBoxX = start.cx - start.rx;
+        const startBoxY = start.cy - start.ry;
+        const startBoxW = start.rx * 2;
+        const startBoxH = start.ry * 2;
+
+        let boxX = startBoxX;
+        let boxY = startBoxY;
+        let boxW = startBoxW;
+        let boxH = startBoxH;
+
+        if (handle.includes('e')) {
+          boxW = Math.max(20, startBoxW + dx);
+        }
+        if (handle.includes('w')) {
+          boxW = Math.max(20, startBoxW - dx);
+          boxX = startBoxX + (startBoxW - boxW);
+        }
+        if (handle.includes('s')) {
+          boxH = Math.max(20, startBoxH + dy);
+        }
+        if (handle.includes('n')) {
+          boxH = Math.max(20, startBoxH - dy);
+          boxY = startBoxY + (startBoxH - boxH);
+        }
+
+        elem.rx = Math.round(boxW / 2);
+        elem.ry = Math.round(boxH / 2);
+        elem.cx = Math.round(boxX + elem.rx);
+        elem.cy = Math.round(boxY + elem.ry);
+      } else if (start.type === 'line' || start.type === 'arrow') {
+        if (handle === 'p1') {
+          elem.x1 = Math.round(start.x1 + dx);
+          elem.y1 = Math.round(start.y1 + dy);
+        } else if (handle === 'p2') {
+          elem.x2 = Math.round(start.x2 + dx);
+          elem.y2 = Math.round(start.y2 + dy);
+        }
+      }
+
+      this.renderDrawingElements();
+      if (this.propertiesPanel && this.propertiesPanel.style.display !== 'none') {
+        this.syncGeometryInputs(elem);
+      }
+      return;
+    }
+
     if (this.isDraggingSvg && this.selectedElement) {
       const dx = worldPos.x - this.svgDragLastWorldPos.x;
       const dy = worldPos.y - this.svgDragLastWorldPos.y;
@@ -823,7 +933,9 @@ class AtelierCanvas {
           });
         }
         this.renderDrawingElements();
-        this.updatePropertiesPanel();
+        if (this.propertiesPanel && this.propertiesPanel.style.display !== 'none') {
+          this.syncGeometryInputs(elem);
+        }
       }
       return;
     }
@@ -899,10 +1011,22 @@ class AtelierCanvas {
       return;
     }
 
+    if (this.isResizingSvg) {
+      this.isResizingSvg = false;
+      this.resizingSvgHandle = null;
+      this.resizingSvgElement = null;
+      this.svgResizeStart = null;
+      this.debounceSaveDrawing();
+      this.updateCursor();
+      this.updatePropertiesPanel();
+      return;
+    }
+
     if (this.isDraggingSvg) {
       this.isDraggingSvg = false;
       this.debounceSaveDrawing();
       this.updateCursor();
+      this.updatePropertiesPanel();
       return;
     }
 
@@ -2149,6 +2273,132 @@ class AtelierCanvas {
     if (updateProps) this.updatePropertiesPanel();
   }
 
+  createSvgResizeHandle(elem, handleType, x, y, size, cursor) {
+    const handle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    handle.setAttribute('x', x - size / 2);
+    handle.setAttribute('y', y - size / 2);
+    handle.setAttribute('width', size);
+    handle.setAttribute('height', size);
+    handle.setAttribute('rx', 2);
+    handle.setAttribute('class', 'svg-resize-handle');
+    handle.setAttribute('data-handle-type', handleType);
+    handle.style.cursor = cursor;
+
+    handle.addEventListener('pointerdown', (e) => {
+      this.startSvgResize(elem, handleType, e);
+    });
+
+    handle.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+    });
+
+    return handle;
+  }
+
+  syncGeometryInputs(elem) {
+    if (!elem) return;
+    const xInput = document.getElementById('prop-svg-x');
+    const yInput = document.getElementById('prop-svg-y');
+    const wInput = document.getElementById('prop-svg-w');
+    const hInput = document.getElementById('prop-svg-h');
+    const cxInput = document.getElementById('prop-svg-cx');
+    const cyInput = document.getElementById('prop-svg-cy');
+    const rxInput = document.getElementById('prop-svg-rx');
+    const ryInput = document.getElementById('prop-svg-ry');
+    const x1Input = document.getElementById('prop-svg-x1');
+    const y1Input = document.getElementById('prop-svg-y1');
+    const x2Input = document.getElementById('prop-svg-x2');
+    const y2Input = document.getElementById('prop-svg-y2');
+
+    if (xInput && elem.x !== undefined && document.activeElement !== xInput) xInput.value = Math.round(elem.x);
+    if (yInput && elem.y !== undefined && document.activeElement !== yInput) yInput.value = Math.round(elem.y);
+    if (wInput && elem.w !== undefined && document.activeElement !== wInput) wInput.value = Math.round(elem.w);
+    if (hInput && elem.h !== undefined && document.activeElement !== hInput) hInput.value = Math.round(elem.h);
+    if (cxInput && elem.cx !== undefined && document.activeElement !== cxInput) cxInput.value = Math.round(elem.cx);
+    if (cyInput && elem.cy !== undefined && document.activeElement !== cyInput) cyInput.value = Math.round(elem.cy);
+    if (rxInput && elem.rx !== undefined && document.activeElement !== rxInput) rxInput.value = Math.round(elem.rx);
+    if (ryInput && elem.ry !== undefined && document.activeElement !== ryInput) ryInput.value = Math.round(elem.ry);
+    if (x1Input && elem.x1 !== undefined && document.activeElement !== x1Input) x1Input.value = Math.round(elem.x1);
+    if (y1Input && elem.y1 !== undefined && document.activeElement !== y1Input) y1Input.value = Math.round(elem.y1);
+    if (x2Input && elem.x2 !== undefined && document.activeElement !== x2Input) x2Input.value = Math.round(elem.x2);
+    if (y2Input && elem.y2 !== undefined && document.activeElement !== y2Input) y2Input.value = Math.round(elem.y2);
+  }
+
+  renderGeometricResizeHandles(elem, boxX, boxY, boxW, boxH) {
+    const handleSize = Math.max(6, Math.min(14, 8 / (this.zoom || 1)));
+    const handleDefs = [
+      { type: 'nw', x: boxX, y: boxY, cursor: 'nwse-resize' },
+      { type: 'n',  x: boxX + boxW / 2, y: boxY, cursor: 'ns-resize' },
+      { type: 'ne', x: boxX + boxW, y: boxY, cursor: 'nesw-resize' },
+      { type: 'e',  x: boxX + boxW, y: boxY + boxH / 2, cursor: 'ew-resize' },
+      { type: 'se', x: boxX + boxW, y: boxY + boxH, cursor: 'nwse-resize' },
+      { type: 's',  x: boxX + boxW / 2, y: boxY + boxH, cursor: 'ns-resize' },
+      { type: 'sw', x: boxX, y: boxY + boxH, cursor: 'nesw-resize' },
+      { type: 'w',  x: boxX, y: boxY + boxH / 2, cursor: 'ew-resize' },
+    ];
+
+    for (const h of handleDefs) {
+      const handleEl = this.createSvgResizeHandle(elem, h.type, h.x, h.y, handleSize, h.cursor);
+      this.svgSelectionGroup.appendChild(handleEl);
+    }
+  }
+
+  renderLineResizeHandles(elem) {
+    const handleSize = Math.max(6, Math.min(14, 8 / (this.zoom || 1)));
+    const h1 = this.createSvgResizeHandle(elem, 'p1', elem.x1, elem.y1, handleSize, 'crosshair');
+    const h2 = this.createSvgResizeHandle(elem, 'p2', elem.x2, elem.y2, handleSize, 'crosshair');
+    this.svgSelectionGroup.appendChild(h1);
+    this.svgSelectionGroup.appendChild(h2);
+  }
+
+  startSvgResize(elem, handleType, e) {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+
+    this.isResizingSvg = true;
+    this.resizingSvgHandle = handleType;
+    this.resizingSvgElement = elem;
+
+    try {
+      if (this.viewport) this.viewport.setPointerCapture(e.pointerId);
+    } catch (_) {}
+
+    const worldPos = this.screenToWorld(e.clientX, e.clientY);
+
+    if (['rect', 'triangle', 'diamond', 'star'].includes(elem.type)) {
+      this.svgResizeStart = {
+        worldPos,
+        x: elem.x,
+        y: elem.y,
+        w: elem.w,
+        h: elem.h,
+        type: elem.type,
+      };
+    } else if (elem.type === 'ellipse') {
+      this.svgResizeStart = {
+        worldPos,
+        cx: elem.cx,
+        cy: elem.cy,
+        rx: elem.rx,
+        ry: elem.ry,
+        type: 'ellipse',
+      };
+    } else if (elem.type === 'line' || elem.type === 'arrow') {
+      this.svgResizeStart = {
+        worldPos,
+        x1: elem.x1,
+        y1: elem.y1,
+        x2: elem.x2,
+        y2: elem.y2,
+        type: elem.type,
+      };
+    }
+
+    this.updateCursor();
+  }
+
   renderSvgSelectionOutline() {
     if (!this.svgSelectionGroup) return;
     this.svgSelectionGroup.innerHTML = '';
@@ -2166,6 +2416,7 @@ class AtelierCanvas {
       rect.setAttribute('rx', 4);
       rect.setAttribute('class', 'svg-selection-outline');
       this.svgSelectionGroup.appendChild(rect);
+      this.renderGeometricResizeHandles(elem, elem.x, elem.y, elem.w, elem.h);
     } else if (elem.type === 'ellipse') {
       const ell = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
       ell.setAttribute('cx', elem.cx);
@@ -2174,6 +2425,7 @@ class AtelierCanvas {
       ell.setAttribute('ry', elem.ry + 3);
       ell.setAttribute('class', 'svg-selection-outline');
       this.svgSelectionGroup.appendChild(ell);
+      this.renderGeometricResizeHandles(elem, elem.cx - elem.rx, elem.cy - elem.ry, elem.rx * 2, elem.ry * 2);
     } else if (['triangle', 'diamond', 'star'].includes(elem.type)) {
       const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
       rect.setAttribute('x', elem.x - 4);
@@ -2183,6 +2435,7 @@ class AtelierCanvas {
       rect.setAttribute('rx', 4);
       rect.setAttribute('class', 'svg-selection-outline');
       this.svgSelectionGroup.appendChild(rect);
+      this.renderGeometricResizeHandles(elem, elem.x, elem.y, elem.w, elem.h);
     } else if (elem.type === 'line' || elem.type === 'arrow') {
       const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       line.setAttribute('x1', elem.x1);
@@ -2192,6 +2445,7 @@ class AtelierCanvas {
       line.setAttribute('class', 'svg-selection-outline');
       line.setAttribute('stroke-width', (elem.stroke_width || elem.width || 2) + 4);
       this.svgSelectionGroup.appendChild(line);
+      this.renderLineResizeHandles(elem);
     } else if (elem.type === 'stroke' && elem.points && elem.points.length > 0) {
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
       for (const pt of elem.points) {
@@ -3075,25 +3329,24 @@ class AtelierCanvas {
       secCoords.appendChild(row1);
       secCoords.appendChild(row2);
 
-      row1.querySelector('#prop-svg-x').addEventListener('change', (e) => {
-        elem.x = parseFloat(e.target.value) || 0;
+      const updateRectGeom = () => {
+        const xVal = parseFloat(row1.querySelector('#prop-svg-x').value);
+        const yVal = parseFloat(row1.querySelector('#prop-svg-y').value);
+        const wVal = parseFloat(row2.querySelector('#prop-svg-w').value);
+        const hVal = parseFloat(row2.querySelector('#prop-svg-h').value);
+        if (!isNaN(xVal)) elem.x = xVal;
+        if (!isNaN(yVal)) elem.y = yVal;
+        if (!isNaN(wVal)) elem.w = Math.max(10, wVal);
+        if (!isNaN(hVal)) elem.h = Math.max(10, hVal);
         this.renderDrawingElements();
+        this.renderSvgSelectionOutline();
         this.debounceSaveDrawing();
-      });
-      row1.querySelector('#prop-svg-y').addEventListener('change', (e) => {
-        elem.y = parseFloat(e.target.value) || 0;
-        this.renderDrawingElements();
-        this.debounceSaveDrawing();
-      });
-      row2.querySelector('#prop-svg-w').addEventListener('change', (e) => {
-        elem.w = Math.max(10, parseFloat(e.target.value) || 20);
-        this.renderDrawingElements();
-        this.debounceSaveDrawing();
-      });
-      row2.querySelector('#prop-svg-h').addEventListener('change', (e) => {
-        elem.h = Math.max(10, parseFloat(e.target.value) || 20);
-        this.renderDrawingElements();
-        this.debounceSaveDrawing();
+      };
+      ['input', 'change'].forEach((evt) => {
+        row1.querySelector('#prop-svg-x').addEventListener(evt, updateRectGeom);
+        row1.querySelector('#prop-svg-y').addEventListener(evt, updateRectGeom);
+        row2.querySelector('#prop-svg-w').addEventListener(evt, updateRectGeom);
+        row2.querySelector('#prop-svg-h').addEventListener(evt, updateRectGeom);
       });
     } else if (elem.type === 'ellipse') {
       const row1 = document.createElement('div');
@@ -3111,25 +3364,24 @@ class AtelierCanvas {
       secCoords.appendChild(row1);
       secCoords.appendChild(row2);
 
-      row1.querySelector('#prop-svg-cx').addEventListener('change', (e) => {
-        elem.cx = parseFloat(e.target.value) || 0;
+      const updateEllipseGeom = () => {
+        const cxVal = parseFloat(row1.querySelector('#prop-svg-cx').value);
+        const cyVal = parseFloat(row1.querySelector('#prop-svg-cy').value);
+        const rxVal = parseFloat(row2.querySelector('#prop-svg-rx').value);
+        const ryVal = parseFloat(row2.querySelector('#prop-svg-ry').value);
+        if (!isNaN(cxVal)) elem.cx = cxVal;
+        if (!isNaN(cyVal)) elem.cy = cyVal;
+        if (!isNaN(rxVal)) elem.rx = Math.max(5, rxVal);
+        if (!isNaN(ryVal)) elem.ry = Math.max(5, ryVal);
         this.renderDrawingElements();
+        this.renderSvgSelectionOutline();
         this.debounceSaveDrawing();
-      });
-      row1.querySelector('#prop-svg-cy').addEventListener('change', (e) => {
-        elem.cy = parseFloat(e.target.value) || 0;
-        this.renderDrawingElements();
-        this.debounceSaveDrawing();
-      });
-      row2.querySelector('#prop-svg-rx').addEventListener('change', (e) => {
-        elem.rx = Math.max(5, parseFloat(e.target.value) || 10);
-        this.renderDrawingElements();
-        this.debounceSaveDrawing();
-      });
-      row2.querySelector('#prop-svg-ry').addEventListener('change', (e) => {
-        elem.ry = Math.max(5, parseFloat(e.target.value) || 10);
-        this.renderDrawingElements();
-        this.debounceSaveDrawing();
+      };
+      ['input', 'change'].forEach((evt) => {
+        row1.querySelector('#prop-svg-cx').addEventListener(evt, updateEllipseGeom);
+        row1.querySelector('#prop-svg-cy').addEventListener(evt, updateEllipseGeom);
+        row2.querySelector('#prop-svg-rx').addEventListener(evt, updateEllipseGeom);
+        row2.querySelector('#prop-svg-ry').addEventListener(evt, updateEllipseGeom);
       });
     } else if (isLineOrArrow) {
       const row1 = document.createElement('div');
@@ -3147,25 +3399,24 @@ class AtelierCanvas {
       secCoords.appendChild(row1);
       secCoords.appendChild(row2);
 
-      row1.querySelector('#prop-svg-x1').addEventListener('change', (e) => {
-        elem.x1 = parseFloat(e.target.value) || 0;
+      const updateLineGeom = () => {
+        const x1Val = parseFloat(row1.querySelector('#prop-svg-x1').value);
+        const y1Val = parseFloat(row1.querySelector('#prop-svg-y1').value);
+        const x2Val = parseFloat(row2.querySelector('#prop-svg-x2').value);
+        const y2Val = parseFloat(row2.querySelector('#prop-svg-y2').value);
+        if (!isNaN(x1Val)) elem.x1 = x1Val;
+        if (!isNaN(y1Val)) elem.y1 = y1Val;
+        if (!isNaN(x2Val)) elem.x2 = x2Val;
+        if (!isNaN(y2Val)) elem.y2 = y2Val;
         this.renderDrawingElements();
+        this.renderSvgSelectionOutline();
         this.debounceSaveDrawing();
-      });
-      row1.querySelector('#prop-svg-y1').addEventListener('change', (e) => {
-        elem.y1 = parseFloat(e.target.value) || 0;
-        this.renderDrawingElements();
-        this.debounceSaveDrawing();
-      });
-      row2.querySelector('#prop-svg-x2').addEventListener('change', (e) => {
-        elem.x2 = parseFloat(e.target.value) || 0;
-        this.renderDrawingElements();
-        this.debounceSaveDrawing();
-      });
-      row2.querySelector('#prop-svg-y2').addEventListener('change', (e) => {
-        elem.y2 = parseFloat(e.target.value) || 0;
-        this.renderDrawingElements();
-        this.debounceSaveDrawing();
+      };
+      ['input', 'change'].forEach((evt) => {
+        row1.querySelector('#prop-svg-x1').addEventListener(evt, updateLineGeom);
+        row1.querySelector('#prop-svg-y1').addEventListener(evt, updateLineGeom);
+        row2.querySelector('#prop-svg-x2').addEventListener(evt, updateLineGeom);
+        row2.querySelector('#prop-svg-y2').addEventListener(evt, updateLineGeom);
       });
     } else if (elem.type === 'text') {
       const row1 = document.createElement('div');
@@ -3176,15 +3427,18 @@ class AtelierCanvas {
       `;
       secCoords.appendChild(row1);
 
-      row1.querySelector('#prop-svg-x').addEventListener('change', (e) => {
-        elem.x = parseFloat(e.target.value) || 0;
+      const updateTextGeom = () => {
+        const xVal = parseFloat(row1.querySelector('#prop-svg-x').value);
+        const yVal = parseFloat(row1.querySelector('#prop-svg-y').value);
+        if (!isNaN(xVal)) elem.x = xVal;
+        if (!isNaN(yVal)) elem.y = yVal;
         this.renderDrawingElements();
+        this.renderSvgSelectionOutline();
         this.debounceSaveDrawing();
-      });
-      row1.querySelector('#prop-svg-y').addEventListener('change', (e) => {
-        elem.y = parseFloat(e.target.value) || 0;
-        this.renderDrawingElements();
-        this.debounceSaveDrawing();
+      };
+      ['input', 'change'].forEach((evt) => {
+        row1.querySelector('#prop-svg-x').addEventListener(evt, updateTextGeom);
+        row1.querySelector('#prop-svg-y').addEventListener(evt, updateTextGeom);
       });
     }
     container.appendChild(secCoords);

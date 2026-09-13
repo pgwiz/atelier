@@ -2,6 +2,32 @@
 
 All notable changes to Atelier will be documented in this file.
 
+## [0.5.2] - 2026-09-13
+
+### Added & Redesigned
+- **Dynamic Board Creation Modal & Unified Modal Design System Overhaul**:
+  - Redesigned `#modal-board` matching the user's compact layout template: icon badge (`.modal-icon-badge`), category tracking section headers (`.modal-section-header`) with required badges, board name input with inline Randomize button and live `0/50` character counter.
+  - Dense two-column selection grid for canvas grid style (Blank Canvas, Dot Grid, Blueprint Grid, Isometric Grid) and studio theme (Dark Room, Clean Light, Sepia Archive, Pastel Studio, Cyberpunk Neon).
+  - Quick-start board presets (General Creative, Storyboarding, Asset Map, Moodboard) that instantly configure name, backdrop pattern, and theme.
+  - Live SVG mini-canvas preview box (`#board-preview-canvas`) reflecting selected background pattern and theme accent swatches in real time without gradients.
+  - Keyboard shortcut footer (`Ctrl + Enter` to create/submit).
+  - Extended the unified modal design system across all application dialogs (Prompts, Characters, Links, Projects, Parts, Addons/Attachments, Merge, Transfer, Confirm) with consistent badge headers, clean section dividers, dense grids, and theme variable inheritance across all studio themes.
+  - Global `Ctrl+Enter` shortcut support across all modal dialogs.
+- **Vertical Canvas Zoom Controls**:
+  - Re-oriented canvas zoom controls (`#canvas-zoom-controls`) in `static/index.html` and `static/style.css` vertically (`flex-direction: column`, stacked: `+`, zoom percentage display, `-`, subtle horizontal divider, `1:1` reset, `Fit` all content).
+- **Interactive Vector Shape Resizing & Enlargement**:
+  - Implemented 8 interactive resize handles (`nw`, `n`, `ne`, `e`, `se`, `s`, `sw`, `w`) on selection of any geometric vector shape (`rect`, `ellipse`, `triangle`, `diamond`, `star`) and 2 endpoint handles (`p1`, `p2`) for lines and arrows in `static/canvas.js`.
+  - Real-time click-and-drag scaling with zoom-independent handle sizing, cursor tracking (`nwse-resize`, `nesw-resize`, `ns-resize`, `ew-resize`, `crosshair`), and pointer capture for smooth gestures.
+  - Auto-centering attached text during shape resize.
+  - Real-time synchronization with the canvas properties panel (bidirectional live sync via `input` and `change` events on geometry fields).
+  - Changes automatically persist to `drawingData` and backend storage on release via debounced `saveDrawing()`.
+
+### Fixed
+- **Duplicate Board Submission**: Removed redundant inline `onsubmit` handler from `#form-board` in `static/index.html` that previously caused duplicate board creations when combined with `addEventListener` in `static/app.js`.
+- **Board Submission Validation**: Added client-side name validation guard in `handleBoardSubmit` to prevent creating untitled boards.
+- **Resize Gesture Performance**: Optimized canvas resize and drag movements to synchronize properties inputs in-place (`syncGeometryInputs`) without destroying and reconstructing panel DOM elements on every mousemove.
+- **Resize Handle Double-Click Isolation**: Suppressed `dblclick` propagation on SVG resize handles, preventing unintentional activation of underlying shape text editing.
+
 ## [0.5.1] - 2026-09-13
 
 ### Added
