@@ -6,6 +6,7 @@
 #define MyAppPublisher "Atelier Studio"
 #define MyAppURL "https://github.com/pgwiz/atelier"
 #define MyAppExeName "atelier.exe"
+#define MyLauncherExeName "atelier-launcher.exe"
 
 [Setup]
 AppId={{E8F6F4C0-8B8E-4547-9D1B-57A9E6C3B12D}
@@ -21,7 +22,7 @@ AllowNoIcons=yes
 OutputDir=..\dist
 OutputBaseFilename=Atelier-Setup-v0.1.0-x64
 SetupIconFile=atelier.ico
-UninstallDisplayIcon={app}\{#MyAppExeName}
+UninstallDisplayIcon={app}\{#MyLauncherExeName}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
@@ -39,14 +40,16 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "..\target\release\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\target\release\{#MyLauncherExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\static\*"; DestDir: "{app}\static"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "atelier.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\atelier.ico"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyLauncherExeName}"; IconFilename: "{app}\atelier.ico"
+Name: "{group}\Atelier Server (Console)"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\atelier.ico"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon; IconFilename: "{app}\atelier.ico"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyLauncherExeName}"; Tasks: desktopicon; IconFilename: "{app}\atelier.ico"
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyLauncherExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent

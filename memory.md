@@ -90,6 +90,17 @@ Atelier is a local-only, single-user content sketchbook and visual planning canv
   - **Smart Storage Resolution**: `src/main.rs` resolves `static/` relative to `current_exe()`. User data is isolated to `%LOCALAPPDATA%\Atelier\data` when installed, preserving project databases across app updates and uninstalls. Supports portable `./data`, `--portable`, `--data-dir <PATH>`, and `ATELIER_DATA_DIR`.
   - **Auto-Browser Launch**: Automatically opens the studio in default browser upon launch (`cmd /C start http://localhost:{port}`), with `--no-browser` and `--headless` suppression flags.
   - **Build Automation**: `build-windows-installer.ps1` automates release build, Inno Setup compiler (`ISCC.exe`), portable zip generation, and SHA256 checksums.
+- **Phase 14: Mini UI Launcher & Control Panel (v0.5.1)**:
+  - **Standalone Native Windows Control Panel (`atelier-launcher.exe`)**: Replaces raw console terminal popups upon install or launch with a sleek native Windows GUI application.
+  - **Live Server Status & Health Probing**: Status badge with real-time health polling displaying `[ RUNNING ]` (green `#10b981`) or `[ STOPPED ]` (muted gray `#94a3b8`).
+  - **Configurable Port Switcher**: Direct port selector and numeric input (1024-65535) with "Apply Port" button allowing instant switching to alternative ports (8080, 8081, 8082, 3000, etc.) with pre-flight port collision protection and automatic server restart.
+  - **Studio URL & One-Click Browser Launch**: Clickable URL link (`http://localhost:<PORT>`) and primary action button opening the user's default web browser (auto-starting server if offline).
+  - **Server Process Supervision**: Start/Stop toggle button managing `atelier.exe` in background without console window popup (`CreateNoWindow = true`, `UseShellExecute = false`).
+  - **Quick Directory Links**: Dedicated buttons to open data directory (`%LOCALAPPDATA%\Atelier\data` or `./data`) and application project directory in Windows File Explorer.
+  - **System Tray & Single-Instance Integration**: NotifyIcon in Windows notification area with embedded application icon, status tooltip, and context menu (Open Browser, Show Control Panel, Toggle Server, Open Data Folder, Exit Atelier). Single-instance mutex with broadcast restore (`WM_SHOW_ATELIER_LAUNCHER`) prevents duplicate processes.
+  - **Automatic Delegation & Console Detaching**: Running `atelier.exe` without `--server` immediately calls `FreeConsole()` to hide the console window and launches `atelier-launcher.exe`.
+  - **Design System Invariants**: Atelier dark theme (`#0f1117` background, `#181b24` card surface, `#2a2e3d` border, `#2563eb` primary accent), max 8px border-radius, strictly zero gradients, and strictly zero emojis across all code, markup, and labels.
+  - **Distribution Pipeline**: Updated `installer/atelier.iss`, `installer/run-atelier.bat`, and `build-windows-installer.ps1` to package and launch `atelier-launcher.exe` as the default application target.
 
 ## Key Rules & Invariants
 - **Markdown file restriction**: Exactly 4 markdown files permitted in the repository: `README.md`, `changelog.md`, `memory.md`, and `agent.md`.

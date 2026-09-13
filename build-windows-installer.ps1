@@ -17,22 +17,55 @@ Write-Host ""
 
 # 1. Ensure Icon Exists
 if (-not (Test-Path "installer\atelier.ico")) {
-    Write-Host "[1/5] Generating Windows multi-resolution icon..." -ForegroundColor Yellow
+    Write-Host "[1/6] Generating Windows multi-resolution icon..." -ForegroundColor Yellow
     python installer\generate_ico.py
 } else {
-    Write-Host "[1/5] Windows application icon ready." -ForegroundColor Green
+    Write-Host "[1/6] Windows application icon ready." -ForegroundColor Green
 }
 
+# Stop any running instances that could lock release binaries
+Get-Process atelier, atelier-launcher -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$ScriptDir*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 300
+
 # 2. Compile Release Binary
-Write-Host "[2/5] Compiling release binary with Cargo..." -ForegroundColor Yellow
+Write-Host "[2/6] Compiling release binary with Cargo..." -ForegroundColor Yellow
 cargo build --release
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Cargo release build failed with exit code $LASTEXITCODE"
 }
 Write-Host "Binary built: target\release\atelier.exe" -ForegroundColor Green
 
-# 3. Locate Inno Setup Compiler (ISCC.exe)
-Write-Host "[3/5] Locating Inno Setup Compiler..." -ForegroundColor Yellow
+# 3. Compile Mini UI Launcher
+Write-Host "[3/6] Compiling Atelier Mini UI Launcher with C# Compiler..." -ForegroundColor Yellow
+$CscCandidates = @(
+    "$env:windir\Microsoft.NET\Framework64\v4.0.30319\csc.exe",
+    "$env:windir\Microsoft.NET\Framework\v4.0.30319\csc.exe"
+)
+$CscPath = $null
+foreach ($cand in $CscCandidates) {
+    if (Test-Path $cand) {
+        $CscPath = $cand
+        break
+    }
+}
+if (-not $CscPath) {
+    $whereCsc = Get-Command "csc.exe" -ErrorAction SilentlyContinue
+    if ($whereCsc) {
+        $CscPath = $whereCsc.Source
+    }
+}
+if (-not $CscPath) {
+    Write-Error "Could not find csc.exe. Please ensure .NET Framework is installed."
+}
+
+& $CscPath /target:winexe /platform:anycpu /win32icon:installer\atelier.ico /out:target\release\atelier-launcher.exe /r:System.Windows.Forms.dll,System.Drawing.dll /optimize+ /nologo src\launcher.cs
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Mini UI Launcher compilation failed with exit code $LASTEXITCODE"
+}
+Write-Host "Launcher built: target\release\atelier-launcher.exe" -ForegroundColor Green
+
+# 4. Locate Inno Setup Compiler (ISCC.exe)
+Write-Host "[4/6] Locating Inno Setup Compiler..." -ForegroundColor Yellow
 $IsccCandidates = @(
     "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
     "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
@@ -62,16 +95,16 @@ Write-Host "Found Inno Setup Compiler: $IsccPath" -ForegroundColor Green
 # Ensure dist output directory exists
 New-Item -ItemType Directory -Force -Path "dist" | Out-Null
 
-# 4. Compile Windows Installer (.exe)
-Write-Host "[4/5] Compiling Inno Setup Windows Installer..." -ForegroundColor Yellow
+# 5. Compile Windows Installer (.exe)
+Write-Host "[5/6] Compiling Inno Setup Windows Installer..." -ForegroundColor Yellow
 & $IsccPath /Qp "installer\atelier.iss"
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Inno Setup compilation failed with exit code $LASTEXITCODE"
 }
 Write-Host "Installer built: dist\Atelier-Setup-v0.1.0-x64.exe" -ForegroundColor Green
 
-# 5. Build Portable ZIP Package
-Write-Host "[5/5] Packaging portable distribution (.zip)..." -ForegroundColor Yellow
+# 6. Build Portable ZIP Package
+Write-Host "[6/6] Packaging portable distribution (.zip)..." -ForegroundColor Yellow
 $PortableStage = "dist\portable_staging\Atelier"
 if (Test-Path $PortableStage) {
     Remove-Item -Recurse -Force $PortableStage
@@ -79,6 +112,7 @@ if (Test-Path $PortableStage) {
 New-Item -ItemType Directory -Force -Path $PortableStage | Out-Null
 
 Copy-Item "target\release\atelier.exe" -Destination $PortableStage -Force
+Copy-Item "target\release\atelier-launcher.exe" -Destination $PortableStage -Force
 Copy-Item "README.md" -Destination $PortableStage -Force
 Copy-Item "installer\atelier.ico" -Destination $PortableStage -Force
 Copy-Item "installer\run-atelier.bat" -Destination $PortableStage -Force

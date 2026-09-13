@@ -2,6 +2,31 @@
 
 All notable changes to Atelier will be documented in this file.
 
+## [0.5.1] - 2026-09-13
+
+### Added
+- **Atelier Mini UI Launcher & Control Panel (`atelier-launcher.exe`)**:
+  - Replaced post-install and desktop console terminal launch with a native Windows Control Panel GUI application compiled with Windows GUI subsystem (strictly no black CLI console window).
+  - **Live Server Status**: Real-time status indicator badge displaying `[ RUNNING ]` (emerald green) or `[ STOPPED ]` (slate gray) with active background polling.
+  - **Dynamic Port Configuration**: Numeric port input (1024 to 65535) with "Apply Port" button enabling instant port switching (e.g. 8080, 8081, 8082, 3000) with automatic zero-downtime server restart.
+  - **Studio URL & Direct Browser Launch**: Prominent clickable URL link (`http://localhost:<PORT>`) and primary "Open Studio in Browser" button that launches the active URL in the default browser.
+  - **Server Process Supervisor**: Clean "Start Server" / "Stop Server" toggle button managing `atelier.exe` in background without console window popup (`CreateNoWindow = true`, `UseShellExecute = false`).
+  - **Quick Directory Navigation**: Dedicated "Open Data Folder" (opens `%LOCALAPPDATA%\Atelier\data` or `./data`) and "Open Project Directory" buttons opening Windows File Explorer.
+  - **Preferences & System Tray**: Auto-open browser toggle, minimize-to-tray on close, and NotifyIcon integration with embedded application icon, status tooltip, and right-click menu (Open Browser, Show Control Panel, Toggle Server, Open Data Folder, Exit Atelier).
+  - **Design System Compliance**: Cohesive dark theme (`#0f1117` background, `#181b24` surface cards, `#2a2e3d` borders, `#2563eb` primary blue), strictly zero gradients, max 8px border-radius, and strictly zero emojis across all code and labels.
+- **Installer & Portable Distribution Integration**:
+  - Updated Inno Setup script (`installer/atelier.iss`) to package `atelier-launcher.exe` as the primary application target for desktop and Start Menu shortcuts, uninstall display icon, and post-installation launch.
+  - Added Start Menu entry for "Atelier Server (Console)" allowing terminal users to run raw CLI backend directly if desired.
+  - Updated `installer/run-atelier.bat` in portable distribution to launch `atelier-launcher.exe --portable` without lingering console windows.
+  - Updated `build-windows-installer.ps1` with automated C# compilation step, pre-build process termination to prevent release binary file locks, and multi-binary packaging.
+- **Backend Server & Launcher Integration**:
+  - Added `--server` and `--launcher` CLI arguments in `src/main.rs`.
+  - Added seamless automatic delegation to `atelier-launcher.exe` when `atelier.exe` is launched without `--server`, instantly detaching console window (`FreeConsole`) and forwarding `--portable` / `--port` arguments.
+  - Implemented single-instance mutex activation with broadcast window restore (`WM_SHOW_ATELIER_LAUNCHER`).
+  - Added pre-flight port collision protection preventing server crashes when selecting occupied ports.
+  - Added Per-Monitor DPI awareness (`SetProcessDPIAware`) for crisp typography on high-DPI displays.
+  - Added static asset directory resolution fallback for developmental target builds.
+
 ## [0.5.0] - 2026-09-12
 
 ### Added

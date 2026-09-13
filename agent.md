@@ -32,6 +32,7 @@ atelier/
   installer/           # Inno Setup .iss, icon generator, .ico, and portable .bat launcher
   src/
     main.rs              # server setup, routing, shared AppState (db pool, paths), error handling
+    launcher.cs          # native Windows Forms Mini UI control panel & supervisor
     db.rs                # connection pool initialization & idempotent schema migrations
     models.rs            # structs for Prompt, Character, Link, Tag, Board, BoardItem, SearchResult
     handlers/
@@ -675,3 +676,18 @@ The board uses an SVG container and an HTML cards container stacked inside a mas
   - Auto-launches default browser to `http://localhost:8080` on launch with `--no-browser` and `--headless` flags.
 - [x] **13.5 Build Automation**:
   - `build-windows-installer.ps1` automates release build, Inno Setup compilation, portable archive packaging, and SHA256 checksums.
+
+### Phase 14: Windows Mini UI Control Panel Launcher & Port Configuration (v0.6.0)
+- [x] **14.1 Native Windows Forms Mini UI Launcher (`src/launcher.cs`)**:
+  - Compact, modern desktop control panel matching Atelier Studio dark theme (solid surface `#181b24`, 1px borders `#2a2e3d`, max 8px border radius, zero gradients).
+  - Server status indicator (Running / Stopped) with real-time health checks and studio URL link (`http://localhost:8080`).
+  - Interactive port changer: numeric spinner (`numPort`), Enter key submission, visual change indicator, and pre-flight socket probe (`ProbePort`) to prevent binding conflicts.
+  - One-click action buttons: "Open in Browser", "Start / Stop Server" supervisor toggle, "Open Data Folder", and "Open Project Directory".
+  - System tray minimization (`MinimizeToTray`) with single-click restore, dynamic tray menu, and single-instance named mutex (`Atelier_Studio_Launcher_SingleInstance_Mutex`).
+  - High-DPI scaling support (`SetProcessDPIAware`) and native application icon extraction.
+- [x] **14.2 Console Detachment & Auto-Delegation**:
+  - `src/main.rs` checks for `--server` mode. When launched without `--server`, immediately detaches the console window via `FreeConsole()`, resolves `atelier-launcher.exe`, and delegates execution seamlessly.
+  - Backend server runs with `CreateNoWindow = true` under the launcher supervisor, completely eliminating black CLI/terminal popups for desktop users.
+- [x] **14.3 Installer & Portable Package Integration**:
+  - Updated `installer/atelier.iss`, `build-windows-installer.ps1`, and `run-atelier.bat` to bundle and launch `atelier-launcher.exe`.
+  - Recompiled installer (`dist/Atelier-Setup-v0.1.0-x64.exe`) and portable zip (`dist/Atelier-v0.1.0-windows-x64-portable.zip`).

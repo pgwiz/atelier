@@ -115,19 +115,29 @@ cargo test
 
 Atelier provides both a full Windows Setup Wizard and a zero-install portable package in `dist/`:
 
-### 1. Windows Installer (`Atelier-Setup-v0.1.0-x64.exe`)
+### 1. Windows Mini UI Control Panel (`atelier-launcher.exe`)
+- **Native GUI Launcher**: Instead of opening a raw console or command-line terminal window, Atelier launches with a sleek, compact desktop control panel.
+- **Server Status & Port Changer**: Real-time status indicator (`[ RUNNING ]` / `[ STOPPED ]`), clickable studio URL, and dynamic port switcher (e.g. 8080, 8081, 8082, 3000).
+- **Fast Action Controls**:
+  - **Open Studio in Browser**: One-click launch into your default web browser.
+  - **Start / Stop Server**: Full process supervision managing the background server cleanly without terminal windows.
+  - **Open Data Folder / Open Project Directory**: Instant navigation in Windows File Explorer.
+  - **System Tray**: Sits unobtrusively in the taskbar notification area with embedded studio icon and right-click action menu.
+
+### 2. Windows Installer (`Atelier-Setup-v0.1.0-x64.exe`)
 - **Install**: Run `dist\Atelier-Setup-v0.1.0-x64.exe`.
 - **Location**: Installed to `%LOCALAPPDATA%\Programs\Atelier` without requiring administrator privileges (or `C:\Program Files\Atelier` if installed for all users).
-- **Shortcuts**: Automatically creates Start Menu and Desktop shortcuts with embedded studio application icons.
+- **Shortcuts**: Automatically creates Start Menu and Desktop shortcuts pointing directly to the Mini UI Launcher (`atelier-launcher.exe`).
+- **Post-Install**: Automatically launches the Mini UI Control Panel upon setup completion.
 - **Safety**: User data (projects, SQLite database, uploads) is stored in `%LOCALAPPDATA%\Atelier\data`, ensuring your creative work is preserved across updates.
 - **Uninstall**: Standard uninstaller registered in Windows `Settings > Apps > Installed apps`.
 
-### 2. Portable Package (`Atelier-v0.1.0-windows-x64-portable.zip`)
+### 3. Portable Package (`Atelier-v0.1.0-windows-x64-portable.zip`)
 - **Extract**: Unzip `dist\Atelier-v0.1.0-windows-x64-portable.zip` anywhere (e.g. on external SSD/USB).
-- **Launch**: Double-click `run-atelier.bat` or run `atelier.exe --portable`.
+- **Launch**: Double-click `run-atelier.bat` or `atelier-launcher.exe`.
 - **Storage**: Automatically keeps all project data in `./data` next to the executable.
 
-### 3. Building the Windows Installer from Source
+### 4. Building the Windows Installer from Source
 ```powershell
 # Build release binary, Windows installer, and portable zip in one command:
 powershell -ExecutionPolicy Bypass -File .\build-windows-installer.ps1
@@ -146,6 +156,8 @@ OPTIONS:
   --portable           Force portable mode (stores data in ./data next to executable)
   --no-browser         Do not open the default web browser on launch
   --headless           Same as --no-browser
+  --server             Run in standalone backend server mode
+  --launcher           Open the Atelier Mini UI control panel
   -h, --help           Print help information
   -v, --version        Print version information
 ```

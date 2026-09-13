@@ -18,6 +18,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         println!("  --portable           Force portable mode (stores data in ./data next to executable)");
         println!("  --no-browser         Do not open the default web browser on launch");
         println!("  --headless           Same as --no-browser");
+        println!("  --server             Run in standalone backend server mode");
+        println!("  --launcher           Open the Atelier Mini UI control panel");
         println!("  -h, --help           Print help information");
         println!("  -v, --version        Print version information");
         return Ok(());
@@ -44,13 +46,65 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let cur_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
-    // 1. Resolve static directory
-    let static_dir = if exe_dir.join("static").is_dir() {
-        exe_dir.join("static")
-    } else if cur_dir.join("static").is_dir() {
-        cur_dir.join("static")
+    // Check if launcher should be opened
+    let launcher_exe = if exe_dir.join("atelier-launcher.exe").is_file() {
+        Some(exe_dir.join("atelier-launcher.exe"))
+    } else if cur_dir.join("atelier-launcher.exe").is_file() {
+        Some(cur_dir.join("atelier-launcher.exe"))
+    } else if cur_dir.join("target").join("release").join("atelier-launcher.exe").is_file() {
+        Some(cur_dir.join("target").join("release").join("atelier-launcher.exe"))
+    } else if exe_dir.join("..").join("release").join("atelier-launcher.exe").is_file() {
+        Some(exe_dir.join("..").join("release").join("atelier-launcher.exe"))
+    } else if exe_dir.join("..").join("..").join("target").join("release").join("atelier-launcher.exe").is_file() {
+        Some(exe_dir.join("..").join("..").join("target").join("release").join("atelier-launcher.exe"))
     } else {
+        None
+    };
+
+    let is_server_mode = args.iter().any(|a| a == "--server");
+    let wants_launcher = args.iter().any(|a| a == "--launcher");
+
+    if (!is_server_mode || wants_launcher) && launcher_exe.is_some() {
+        let path = launcher_exe.unwrap();
+        #[cfg(target_os = "windows")]
+        unsafe {
+            extern "system" {
+                fn FreeConsole() -> i32;
+            }
+            FreeConsole();
+        }
+
+        let mut forward_args = Vec::new();
+        let mut i = 1;
+        while i < args.len() {
+            if args[i] == "--portable" {
+                forward_args.push("--portable".to_string());
+                i += 1;
+            } else if args[i] == "--port" && i + 1 < args.len() {
+                forward_args.push("--port".to_string());
+                forward_args.push(args[i + 1].clone());
+                i += 2;
+            } else {
+                i += 1;
+            }
+        }
+
+        tracing::info!("Launching Atelier Control Panel Mini UI: {:?}", path);
+        let _ = std::process::Command::new(path).args(&forward_args).spawn();
+        return Ok(());
+    }
+
+    // 1. Resolve static directory
+    let static_dir = if exe_dir.join("static").join("index.html").is_file() {
         exe_dir.join("static")
+    } else if cur_dir.join("static").join("index.html").is_file() {
+        cur_dir.join("static")
+    } else if exe_dir.join("..").join("..").join("static").join("index.html").is_file() {
+        exe_dir.join("..").join("..").join("static")
+    } else if exe_dir.join("static").is_dir() {
+        exe_dir.join("static")
+    } else {
+        cur_dir.join("static")
     };
 
     // 2. Parse command-line parameters
